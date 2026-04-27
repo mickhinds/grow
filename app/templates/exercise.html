@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Exercise — Grow{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('dashboard.index') }}" class="back-link">&larr; Dashboard</a>
+<div class="page-title">Exercise</div>
+
+<!-- Weekly progress -->
+<div class="card">
+  <div class="card-label">This week</div>
+  <div class="stat-row">
+    <span class="stat-label">Sessions</span>
+    <span class="stat-value {% if week_count >= target %}stat-value-good{% elif week_count > 0 %}stat-value-warn{% endif %}">
+      {{ week_count }} / {{ target }}
+    </span>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-fill" style="width: {{ [100, (week_count / target * 100)|round|int]|min }}%"></div>
+  </div>
+</div>
+
+<!-- Log a workout -->
+<div class="card">
+  <div class="card-label">Log a session</div>
+  <form method="POST" action="{{ url_for('tracking.exercise_log') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-group">
+      <label class="form-label">Activity</label>
+      <select name="activity_type" class="form-input">
+        {% for t in activity_types %}
+        <option value="{{ t }}">{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <div class="form-group" style="flex:1;">
+        <label class="form-label">Duration (min)</label>
+        <input type="number" name="duration" class="form-input" placeholder="45">
+      </div>
+      <div class="form-group" style="flex:1;">
+        <label class="form-label">Date</label>
+        <input type="date" name="date" class="form-input" value="{{ today }}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Intensity</label>
+      <div class="radio-group">
+        <div class="radio-btn">
+          <input type="radio" name="intensity" id="int-low" value="low">
+          <label for="int-low">Light</label>
+        </div>
+        <div class="radio-btn">
+          <input type="radio" name="intensity" id="int-med" value="medium" checked>
+          <label for="int-med">Medium</label>
+        </div>
+        <div class="radio-btn">
+          <input type="radio" name="intensity" id="int-high" value="high">
+          <label for="int-high">Hard</label>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <textarea name="notes" class="form-input" rows="2" placeholder="Optional..."></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary btn-block">Log workout</button>
+  </form>
+</div>
+
+<!-- Recent workouts -->
+{% if recent %}
+<div class="card">
+  <div class="card-label">Recent sessions</div>
+  {% for w in recent %}
+  <div class="history-item">
+    <div>
+      <span class="history-value">{{ w.activity_type }}</span>
+      {% if w.duration_mins %}<span class="text-muted text-sm"> · {{ w.duration_mins }} min</span>{% endif %}
+      {% if w.source == "oura" %}<span class="text-muted text-sm"> · Oura</span>{% endif %}
+    </div>
+    <div class="history-date">{{ w.date.strftime('%-d %b') }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

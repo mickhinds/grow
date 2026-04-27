@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Log — Grow{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('dashboard.index') }}" class="back-link">&larr; Dashboard</a>
+<div class="page-title">Log a choice</div>
+
+<!-- Quick actions -->
+<div class="card">
+  <div class="card-label">Quick log</div>
+  <div class="btn-row">
+    <button type="button" class="btn btn-sm btn-outline" id="skip-btn-log">Chose not to</button>
+    <button type="button" class="btn btn-sm btn-ghost" id="sweet-btn-log">Had a sweet</button>
+  </div>
+
+  <!-- Chose not to — expandable -->
+  <form method="POST" action="{{ url_for('tracking.quick_skip') }}" id="skip-form-log" style="display:none; margin-top:10px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="form-label" style="font-weight:500; color:var(--muted);">What helped you say no?</label>
+    <div style="display:flex; gap:8px; align-items:flex-end; margin-top:4px;">
+      <div style="flex:1;">
+        <input type="text" name="motivation" class="form-input" placeholder="e.g. thought of my goal, wasn't really hungry, went for a walk"
+               style="min-height:40px; padding:8px 12px; font-size:0.88rem;" maxlength="300">
+      </div>
+      <button type="submit" class="btn btn-sm btn-outline" style="white-space:nowrap;">Log</button>
+    </div>
+    <button type="submit" class="text-sm text-muted" style="background:none; border:none; cursor:pointer; margin-top:6px; text-decoration:underline;">
+      Skip, just log the choice
+    </button>
+  </form>
+
+  <!-- Had a sweet — expandable -->
+  <form method="POST" action="{{ url_for('tracking.quick_sweet') }}" id="sweet-form-log" style="display:none; margin-top:10px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="what" value="sweet">
+    <label class="form-label" style="font-weight:500; color:var(--muted);">Do you want to share the circumstance?</label>
+    <div style="display:flex; gap:8px; align-items:flex-end; margin-top:4px;">
+      <div style="flex:1;">
+        <input type="text" name="reason" class="form-input" placeholder="e.g. cake at meeting, tired after lunch"
+               style="min-height:40px; padding:8px 12px; font-size:0.88rem;" maxlength="300">
+      </div>
+      <button type="submit" class="btn btn-sm btn-ghost" style="white-space:nowrap;">Log</button>
+    </div>
+    <button type="submit" class="text-sm text-muted" style="background:none; border:none; cursor:pointer; margin-top:6px; text-decoration:underline;">
+      Skip, just log the sweet
+    </button>
+  </form>
+
+  <script>
+    document.getElementById('skip-btn-log').addEventListener('click', function() {
+      this.style.display = 'none';
+      document.getElementById('sweet-btn-log').style.display = 'none';
+      document.getElementById('sweet-form-log').style.display = 'none';
+      document.getElementById('skip-form-log').style.display = 'block';
+      document.getElementById('skip-form-log').querySelector('input[name=motivation]').focus();
+    });
+    document.getElementById('sweet-btn-log').addEventListener('click', function() {
+      this.style.display = 'none';
+      document.getElementById('skip-btn-log').style.display = 'none';
+      document.getElementById('skip-form-log').style.display = 'none';
+      document.getElementById('sweet-form-log').style.display = 'block';
+      document.getElementById('sweet-form-log').querySelector('input[name=reason]').focus();
+    });
+  </script>
+  <div class="text-sm text-muted mt-8">
+    Both earn seeds. Awareness counts. Choosing not to counts more.
+  </div>
+</div>
+
+<!-- Detailed form -->
+<div class="card">
+  <div class="card-label">Detailed log</div>
+  <form method="POST" action="{{ url_for('tracking.food_log') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <div class="radio-group">
+        <div class="radio-btn">
+          <input type="radio" name="category" value="sweet" id="cat-sweet" checked>
+          <label for="cat-sweet">Sweet</label>
+        </div>
+        <div class="radio-btn">
+          <input type="radio" name="category" value="snack" id="cat-snack">
+          <label for="cat-snack">Snack</label>
+        </div>
+        <div class="radio-btn">
+          <input type="radio" name="category" value="drink" id="cat-drink">
+          <label for="cat-drink">Drink</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="description">What?</label>
+      <input type="text" name="description" id="description" class="form-input"
+             placeholder="Cookie, chocolate, wine...">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="time">When?</label>
+      <input type="time" name="time" id="time" class="form-input">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="notes">What was going on?</label>
+      <textarea name="notes" id="notes" class="form-input" rows="2"
+                placeholder="Stressed? Bored? Social? Habit?"></textarea>
+      <div class="form-hint">Patterns are more valuable than calories.</div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">Log it</button>
+  </form>
+</div>
+
+{% if entries %}
+<div class="card">
+  <div class="card-label">Today's entries</div>
+  {% for entry in entries %}
+  <div style="padding:10px 0; border-bottom:1px solid var(--border);">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <span class="history-date">{{ entry.time or '—' }}</span>
+      <span class="history-value">
+        {% if entry.chose_not_to %}
+          <span style="color:var(--green);">Skipped</span>
+        {% else %}
+          {{ entry.description or entry.category }}
+        {% endif %}
+      </span>
+    </div>
+    {% if entry.notes %}
+    <div class="text-sm text-muted" style="margin-top:2px;">{{ entry.notes }}</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

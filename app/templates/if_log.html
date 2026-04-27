@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}IF Tracking — Grow{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('dashboard.index') }}" class="back-link">&larr; Dashboard</a>
+<div class="page-title">Intermittent fasting</div>
+
+{% if today_session %}
+<div class="card card-green">
+  <div class="card-label">Today</div>
+  <div class="stat-value stat-value-good">Logged</div>
+  <div class="text-sm text-muted mt-8">
+    {{ today_session.start_time }} – {{ today_session.end_time }}
+    &middot; {{ "On track" if today_session.adherence else "Adjusted" }}
+    {% if today_session.notes %} &middot; {{ today_session.notes }}{% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <form method="POST" action="{{ url_for('tracking.if_log') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-group">
+      <label class="form-label">Did you stay in your eating window?</label>
+      <div class="radio-group">
+        <div class="radio-btn">
+          <input type="radio" name="adherence" value="yes" id="if-yes" checked>
+          <label for="if-yes">Yes</label>
+        </div>
+        <div class="radio-btn">
+          <input type="radio" name="adherence" value="no" id="if-no">
+          <label for="if-no">No</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="start_time">Ate from</label>
+      <input type="time" name="start_time" id="start_time" class="form-input"
+             value="{{ user.if_start or '11:00' }}">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="end_time">Ate until</label>
+      <input type="time" name="end_time" id="end_time" class="form-input"
+             value="{{ user.if_end or '19:00' }}">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="date">Date</label>
+      <input type="date" name="date" id="date" class="form-input">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="notes">Notes — optional</label>
+      <textarea name="notes" id="notes" class="form-input" rows="2"
+                placeholder="What happened? Lunch meeting? Late dinner?"></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">Log IF</button>
+  </form>
+</div>
+
+{% if recent %}
+<div class="card">
+  <div class="card-label">Recent days</div>
+  {% for session in recent %}
+  <div class="history-item">
+    <span class="history-date">{{ session.date.strftime('%a %-d %b') }}</span>
+    <span class="history-value">
+      {% if session.adherence %}
+        <span style="color:var(--green);">On track</span>
+      {% else %}
+        <span style="color:var(--amber);">Adjusted</span>
+      {% endif %}
+      {{ session.start_time }}–{{ session.end_time }}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

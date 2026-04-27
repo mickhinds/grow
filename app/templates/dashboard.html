@@ -1,0 +1,470 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Header -->
+<div class="header">
+  <div class="header-greeting">Good morning, {{ user.name }}</div>
+  <div class="header-date">
+    {{ today.strftime('%A, %B %-d') }}
+    {% if days_active > 0 %}
+    <span class="header-day">Day {{ days_active }}</span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Setup banner (if Oura not connected) -->
+{% if not oura_connected %}
+<div class="setup-banner">
+  <p>Connect your Oura Ring to start growing.</p>
+  <a href="{{ url_for('auth.settings') }}" class="btn btn-primary">Set up in Settings</a>
+</div>
+{% elif not oura and not oura_today %}
+<!-- Connected but no data yet -->
+<div class="card">
+  <div class="card-label">Oura connected — no data yet</div>
+  <div class="text-sm text-muted mb-8">Tap sync to pull your latest data from Oura.</div>
+  <form method="POST" action="{{ url_for('dashboard.manual_sync') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="btn btn-primary btn-block">Sync now</button>
+  </form>
+</div>
+{% endif %}
+
+<!-- Garden card — with visual -->
+<div class="garden-card">
+  <div class="card-label">Your garden</div>
+  {% if yesterday_seeds %}
+  <div class="garden-seeds">
+    +{{ yesterday_seeds.seeds_total }} seeds yesterday
+  </div>
+  {% else %}
+  <div class="garden-seeds">No seeds yet today</div>
+  {% endif %}
+
+  <!-- Visual garden scene -->
+  {% if garden %}
+  {% set m = garden.meadow_growth %}
+  {% set o = garden.oak_growth %}
+  {% set p = garden.pond_growth %}
+  {% set s = garden.stones_growth %}
+  {% set pa = garden.path_growth %}
+
+  <div class="garden-visual">
+    <div class="garden-ground"></div>
+
+    <!-- Path (awareness) -->
+    <div class="garden-path" style="opacity: {{ 0.2 + pa * 0.008 }};"></div>
+
+    <!-- Flowers (movement/meadow) -->
+    <div class="garden-flowers" style="opacity: {{ 0.3 + m * 0.007 }};">
+      {% if m > 10 %}<div class="flower flower-yellow"></div>{% endif %}
+      {% if m > 25 %}<div class="flower flower-pink"></div>{% endif %}
+      {% if m > 40 %}<div class="flower flower-white"></div>{% endif %}
+      {% if m > 55 %}<div class="flower flower-blue"></div>{% endif %}
+      {% if m > 70 %}<div class="flower flower-yellow"></div>{% endif %}
+      {% if m > 85 %}<div class="flower flower-pink"></div>{% endif %}
+    </div>
+
+    <!-- Oak tree (IF) -->
+    {% set trunk_h = 10 + (o * 0.3)|int %}
+    {% set canopy_w = 16 + (o * 0.44)|int %}
+    {% set canopy_h = 12 + (o * 0.38)|int %}
+    <div class="garden-oak">
+      <div class="oak-canopy" style="width: {{ canopy_w }}px; height: {{ canopy_h }}px;"></div>
+      <div class="oak-trunk" style="height: {{ trunk_h }}px;"></div>
+    </div>
+
+    <!-- Pond (sleep) -->
+    {% set pond_w = 16 + (p * 0.34)|int %}
+    {% set pond_h = 10 + (p * 0.2)|int %}
+    <div class="garden-pond" style="width: {{ pond_w }}px; height: {{ pond_h }}px;"></div>
+
+    <!-- Stones (training) -->
+    <div class="garden-stones" style="opacity: {{ 0.3 + s * 0.007 }};">
+      {% if s > 10 %}<div class="stone" style="width:8px; height:6px;"></div>{% endif %}
+      {% if s > 30 %}<div class="stone" style="width:10px; height:10px;"></div>{% endif %}
+      {% if s > 50 %}<div class="stone" style="width:12px; height:14px;"></div>{% endif %}
+      {% if s > 70 %}<div class="stone" style="width:8px; height:8px;"></div>{% endif %}
+      {% if s > 90 %}<div class="stone" style="width:6px; height:10px;"></div>{% endif %}
+    </div>
+  </div>
+
+  <!-- Element progress bars -->
+  <div class="garden-elements">
+    <div class="garden-element">
+      <div class="garden-element-bar">
+        <div class="garden-element-fill fill-green" style="width: {{ m }}%;"></div>
+      </div>
+      <div class="garden-element-label">Meadow</div>
+    </div>
+    <div class="garden-element">
+      <div class="garden-element-bar">
+        <div class="garden-element-fill fill-emerald" style="width: {{ o }}%;"></div>
+      </div>
+      <div class="garden-element-label">Oak</div>
+    </div>
+    <div class="garden-element">
+      <div class="garden-element-bar">
+        <div class="garden-element-fill fill-blue" style="width: {{ p }}%;"></div>
+      </div>
+      <div class="garden-element-label">Pond</div>
+    </div>
+    <div class="garden-element">
+      <div class="garden-element-bar">
+        <div class="garden-element-fill fill-purple" style="width: {{ s }}%;"></div>
+      </div>
+      <div class="garden-element-label">Stones</div>
+    </div>
+    <div class="garden-element">
+      <div class="garden-element-bar">
+        <div class="garden-element-fill fill-amber" style="width: {{ pa }}%;"></div>
+      </div>
+      <div class="garden-element-label">Path</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Level progress -->
+  <div class="garden-level">
+    Level {{ level_info.level }} &middot; {{ level_info.total_seeds }} total seeds
+    &middot; {{ level_info.seeds_to_next }} to next level
+  </div>
+  <div class="progress-bar">
+    <div class="progress-fill" style="width: {{ level_info.progress_pct }}%"></div>
+  </div>
+
+  <!-- Streaks -->
+  {% if garden and (garden.if_streak_days > 0 or garden.step_streak_days > 0) %}
+  <div class="streak-row">
+    {% if garden.step_streak_days > 0 %}
+    <div class="streak-item">
+      <span class="streak-count">{{ garden.step_streak_days }}</span> day step streak
+    </div>
+    {% endif %}
+    {% if garden.if_streak_days > 0 %}
+    <div class="streak-item">
+      <span class="streak-count">{{ garden.if_streak_days }}</span> day IF streak
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Today's schedule (if Google Calendar connected) -->
+{% if google_connected and today_events %}
+<div class="card card-blue">
+  <div class="card-label">Today's schedule</div>
+  {% if day_analysis and day_analysis.is_busy_day %}
+  <div class="text-sm text-muted mb-8">{{ day_analysis.total_meetings }} meetings &middot; ~{{ day_analysis.busy_hours }}h booked</div>
+  {% elif day_analysis and day_analysis.is_light_day %}
+  <div class="text-sm text-muted mb-8">Light day &middot; {{ day_analysis.total_meetings }} meeting{{ 's' if day_analysis.total_meetings != 1 }}</div>
+  {% endif %}
+  {% for event in today_events[:6] %}
+  <div class="training-item">
+    <span class="training-label">{{ event.summary|truncate(30) }}</span>
+    <span class="training-time">
+      {% if event.is_all_day %}All day{% else %}{{ event.start_time }}{% if event.end_time %} – {{ event.end_time }}{% endif %}{% endif %}
+    </span>
+  </div>
+  {% endfor %}
+  {% if today_events|length > 6 %}
+  <div class="text-sm text-muted mt-8">+ {{ today_events|length - 6 }} more</div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Movement / Activity -->
+{% set activity = oura_today or oura %}
+{% set activity_label = "Today" if oura_today and oura_today.steps else "Yesterday" %}
+{% if activity and activity.steps is not none %}
+<div class="card card-green">
+  <div class="card-label">Movement &middot; {{ activity_label }}</div>
+
+  <!-- Steps with progress -->
+  <div class="stat-row">
+    <span class="stat-label">Steps</span>
+    <span class="stat-value {% if activity.steps >= user.step_target %}stat-value-good{% elif activity.steps >= user.step_target * 0.7 %}stat-value-warn{% endif %}">
+      {{ "{:,}".format(activity.steps) }}
+      {% if yesterday_seeds and yesterday_seeds.seeds_steps > 0 and activity_label == "Yesterday" %}
+      <span class="seeds-badge">+{{ yesterday_seeds.seeds_steps }}</span>
+      {% endif %}
+    </span>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-fill{% if activity.steps < user.step_target * 0.7 %}-amber{% endif %}"
+         style="width: {{ [100, (activity.steps / user.step_target * 100)|round|int]|min }}%"></div>
+  </div>
+  <div class="text-sm text-muted mt-8">
+    {{ ((activity.steps / user.step_target * 100)|round|int) }}% of {{ "{:,}".format(user.step_target) }} target
+  </div>
+
+  <!-- Movement detail grid -->
+  <div class="movement-grid">
+    {% if activity.activity_score %}
+    <div class="movement-mini">
+      <div class="movement-mini-value {% if activity.activity_score >= 70 %}stat-value-good{% elif activity.activity_score >= 50 %}stat-value-warn{% endif %}">{{ activity.activity_score }}</div>
+      <div class="movement-mini-label">Activity score</div>
+    </div>
+    {% endif %}
+    {% if activity.active_calories %}
+    <div class="movement-mini">
+      <div class="movement-mini-value">{{ activity.active_calories }}</div>
+      <div class="movement-mini-label">Active kcal</div>
+    </div>
+    {% endif %}
+    {% if activity.calories_burned %}
+    <div class="movement-mini">
+      <div class="movement-mini-value">{{ "{:,.0f}".format(activity.calories_burned) }}</div>
+      <div class="movement-mini-label">Total kcal</div>
+    </div>
+    {% endif %}
+    {% if activity.met_minutes_high %}
+    <div class="movement-mini">
+      <div class="movement-mini-value">{{ activity.met_minutes_high }}</div>
+      <div class="movement-mini-label">High MET min</div>
+    </div>
+    {% endif %}
+  </div>
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+    <span class="text-sm text-muted">
+      {% if last_synced %}Synced {{ last_synced.strftime('%-d %b %H:%M') }}{% endif %}
+    </span>
+    <form method="POST" action="{{ url_for('dashboard.manual_sync') }}" style="margin:0;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-sm btn-ghost" style="padding:4px 10px;">Sync</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<!-- Last night (sleep) -->
+{% if oura and oura.sleep_score %}
+<div class="card card-blue">
+  <div class="card-label">Last night</div>
+  <div class="stat-row">
+    <span class="stat-label">Sleep score</span>
+    <span class="stat-value {% if oura.sleep_score >= 75 %}stat-value-good{% elif oura.sleep_score >= 60 %}stat-value-warn{% endif %}">
+      {{ oura.sleep_score }}
+      {% if yesterday_seeds and yesterday_seeds.seeds_sleep > 0 %}
+      <span class="seeds-badge">+{{ yesterday_seeds.seeds_sleep }}</span>
+      {% endif %}
+    </span>
+  </div>
+  {% if oura.total_sleep_mins %}
+  <div class="stat-row">
+    <span class="stat-label">Duration</span>
+    <span class="stat-value">{{ (oura.total_sleep_mins // 60) }}h {{ (oura.total_sleep_mins % 60) }}m</span>
+  </div>
+  {% endif %}
+  {% if oura.deep_sleep_mins %}
+  <div class="stat-row">
+    <span class="stat-label">Deep sleep</span>
+    <span class="stat-value">{{ (oura.deep_sleep_mins // 60) }}h {{ (oura.deep_sleep_mins % 60) }}m</span>
+  </div>
+  {% endif %}
+  {% if oura.rem_sleep_mins %}
+  <div class="stat-row">
+    <span class="stat-label">REM sleep</span>
+    <span class="stat-value">{{ (oura.rem_sleep_mins // 60) }}h {{ (oura.rem_sleep_mins % 60) }}m</span>
+  </div>
+  {% endif %}
+  {% if oura.readiness_score %}
+  <div class="stat-row">
+    <span class="stat-label">Readiness</span>
+    <span class="stat-value {% if oura.readiness_score >= 70 %}stat-value-good{% elif oura.readiness_score >= 60 %}stat-value-warn{% endif %}">
+      {{ oura.readiness_score }}
+      {% if oura.readiness_score >= 70 %} — Good to go{% endif %}
+    </span>
+  </div>
+  {% endif %}
+  {% if oura.resting_heart_rate %}
+  <div class="stat-row">
+    <span class="stat-label">Resting HR</span>
+    <span class="stat-value">{{ oura.resting_heart_rate }} bpm</span>
+  </div>
+  {% endif %}
+  {% if oura.hrv_daily %}
+  <div class="stat-row">
+    <span class="stat-label">HRV balance</span>
+    <span class="stat-value">{{ oura.hrv_daily }}</span>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- IF status -->
+<div class="card card-amber">
+  <div class="card-label">Fasting</div>
+  <div class="if-status">
+    <span class="if-dot if-dot-{{ if_status.status }}"></span>
+    <span class="stat-value">{{ if_status.status|capitalize }}</span>
+    <span class="text-muted text-sm">&mdash; {{ if_status.message }}</span>
+  </div>
+  <div class="text-sm text-muted mt-8">
+    Window: {{ if_status.window }}
+    {% if if_total > 0 %}
+    &middot; This week: {{ if_adherent }}/{{ if_total }} days
+    {% endif %}
+  </div>
+  <div class="btn-row">
+    <form method="POST" action="{{ url_for('tracking.if_quick_log') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-sm btn-outline">IF on track today</button>
+    </form>
+    <a href="{{ url_for('tracking.if_form') }}" class="btn btn-sm btn-ghost">Details</a>
+  </div>
+</div>
+
+<!-- Exercise / Training -->
+<div class="card card-purple">
+  <div class="card-label">Exercise</div>
+
+  <!-- Weekly progress -->
+  <div class="stat-row">
+    <span class="stat-label">This week</span>
+    <span class="stat-value {% if workouts_this_week|length >= (user.weekly_training_target or 2) %}stat-value-good{% elif workouts_this_week|length > 0 %}stat-value-warn{% endif %}">
+      {{ workouts_this_week|length }} / {{ user.weekly_training_target or 2 }} sessions
+      {% if yesterday_seeds and yesterday_seeds.seeds_training > 0 %}
+      <span class="seeds-badge">+{{ yesterday_seeds.seeds_training }}</span>
+      {% endif %}
+    </span>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-fill{% if workouts_this_week|length == 0 %}-amber{% endif %}"
+         style="width: {{ [100, (workouts_this_week|length / (user.weekly_training_target or 2) * 100)|round|int]|min }}%"></div>
+  </div>
+
+  <!-- Recent workouts -->
+  {% if recent_workouts %}
+  <div class="mt-8">
+    {% for w in recent_workouts %}
+    <div class="training-item">
+      <span class="training-label">{{ w.activity_type }}{% if w.duration_mins %} · {{ w.duration_mins }}m{% endif %}</span>
+      <span class="training-time">{{ w.date.strftime('%-d %b') }}{% if w.source == "oura" %} · Oura{% endif %}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Upcoming scheduled -->
+  {% if training %}
+  <div class="text-sm text-muted mt-8">
+    Next: {% for t in training %}{{ t.label }} {{ t.type }} {{ t.time }}{% if not loop.last %}, {% endif %}{% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Quick log + full form -->
+  <div class="btn-row">
+    <form method="POST" action="{{ url_for('tracking.exercise_quick_log') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="activity_type" value="Kettlebell">
+      <button type="submit" class="btn btn-sm btn-outline">Log kettlebell</button>
+    </form>
+    <a href="{{ url_for('tracking.exercise_form') }}" class="btn btn-sm btn-ghost">Log other</a>
+  </div>
+</div>
+
+<!-- Movement nudge -->
+{% if movement_nudge %}
+<div class="insight-card">
+  <div class="insight-label">{{ movement_nudge.type|capitalize }}</div>
+  {{ movement_nudge.message }}
+</div>
+{% endif %}
+
+<!-- Weight -->
+<div class="card">
+  <div class="card-label">Weight</div>
+  {% if latest_weight %}
+  <div class="stat-row">
+    <span class="stat-label">Latest</span>
+    <span class="stat-value">{{ latest_weight.weight_kg }} kg</span>
+  </div>
+  <div class="text-sm text-muted">
+    Logged {{ latest_weight.date.strftime('%-d %B') }}
+    {% if prev_weight %}
+    &middot; Trend:
+    {% set diff = latest_weight.weight_kg - prev_weight.weight_kg %}
+    {% if diff < 0 %}
+    <span style="color:var(--green); font-weight:600;">{{ "%.1f"|format(diff) }} kg</span>
+    {% elif diff > 0 %}
+    <span style="color:var(--amber); font-weight:600;">+{{ "%.1f"|format(diff) }} kg</span>
+    {% else %}
+    <span>no change</span>
+    {% endif %}
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="text-muted">No weight logged yet.</div>
+  {% endif %}
+  <a href="{{ url_for('tracking.weight_form') }}" class="btn btn-sm btn-ghost mt-8" style="display:inline-block;">Log weight</a>
+</div>
+
+<!-- Quick actions -->
+<div class="card">
+  <div class="card-label">Quick log</div>
+  <div class="btn-row">
+    <button type="button" class="btn btn-sm btn-outline" id="skip-btn">Chose not to</button>
+    <button type="button" class="btn btn-sm btn-ghost" id="sweet-btn">Had a sweet</button>
+  </div>
+
+  <!-- Chose not to — expandable -->
+  <form method="POST" action="{{ url_for('tracking.quick_skip') }}" id="skip-form" style="display:none; margin-top:10px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="form-label" style="font-weight:500; color:var(--muted);">What helped you say no?</label>
+    <div style="display:flex; gap:8px; align-items:flex-end; margin-top:4px;">
+      <div style="flex:1;">
+        <input type="text" name="motivation" class="form-input" placeholder="e.g. thought of my goal, wasn't really hungry, went for a walk"
+               style="min-height:40px; padding:8px 12px; font-size:0.88rem;" maxlength="300">
+      </div>
+      <button type="submit" class="btn btn-sm btn-outline" style="white-space:nowrap;">Log</button>
+    </div>
+    <button type="submit" class="text-sm text-muted" style="background:none; border:none; cursor:pointer; margin-top:6px; text-decoration:underline;">
+      Skip, just log the choice
+    </button>
+  </form>
+
+  <!-- Had a sweet — expandable -->
+  <form method="POST" action="{{ url_for('tracking.quick_sweet') }}" id="sweet-form" style="display:none; margin-top:10px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="what" value="sweet">
+    <label class="form-label" style="font-weight:500; color:var(--muted);">Do you want to share the circumstance?</label>
+    <div style="display:flex; gap:8px; align-items:flex-end; margin-top:4px;">
+      <div style="flex:1;">
+        <input type="text" name="reason" class="form-input" placeholder="e.g. cake at meeting, tired after lunch"
+               style="min-height:40px; padding:8px 12px; font-size:0.88rem;" maxlength="300">
+      </div>
+      <button type="submit" class="btn btn-sm btn-ghost" style="white-space:nowrap;">Log</button>
+    </div>
+    <button type="submit" class="text-sm text-muted" style="background:none; border:none; cursor:pointer; margin-top:6px; text-decoration:underline;">
+      Skip, just log the sweet
+    </button>
+  </form>
+
+  <script>
+    document.getElementById('skip-btn').addEventListener('click', function() {
+      this.style.display = 'none';
+      document.getElementById('sweet-btn').style.display = 'none';
+      document.getElementById('sweet-form').style.display = 'none';
+      document.getElementById('skip-form').style.display = 'block';
+      document.getElementById('skip-form').querySelector('input[name=motivation]').focus();
+    });
+    document.getElementById('sweet-btn').addEventListener('click', function() {
+      this.style.display = 'none';
+      document.getElementById('skip-btn').style.display = 'none';
+      document.getElementById('skip-form').style.display = 'none';
+      document.getElementById('sweet-form').style.display = 'block';
+      document.getElementById('sweet-form').querySelector('input[name=reason]').focus();
+    });
+  </script>
+</div>
+
+<!-- Insight -->
+{% if notification %}
+<div class="insight-card">
+  <div class="insight-label">Insight</div>
+  {{ notification.message }}
+</div>
+{% endif %}
+
+{% endblock %}

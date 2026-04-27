@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>{% block title %}Grow{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% block head %}{% endblock %}
+</head>
+<body>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container">
+      {% for category, message in messages %}
+      <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <nav class="bottom-nav">
+    <a href="{{ url_for('dashboard.index') }}" class="nav-item {% if request.endpoint == 'dashboard.index' %}active{% endif %}">
+      <span class="nav-icon">&#9678;</span>
+      <span class="nav-label">Home</span>
+    </a>
+    <a href="{{ url_for('tracking.if_form') }}" class="nav-item {% if 'if' in request.endpoint|default('') %}active{% endif %}">
+      <span class="nav-icon">&#9201;</span>
+      <span class="nav-label">IF</span>
+    </a>
+    <a href="{{ url_for('tracking.exercise_form') }}" class="nav-item {% if 'exercise' in request.endpoint|default('') %}active{% endif %}">
+      <span class="nav-icon">&#9883;</span>
+      <span class="nav-label">Exercise</span>
+    </a>
+    <a href="{{ url_for('tracking.food_form') }}" class="nav-item {% if 'food' in request.endpoint|default('') or 'log' in request.endpoint|default('') %}active{% endif %}">
+      <span class="nav-icon">&#9998;</span>
+      <span class="nav-label">Log</span>
+    </a>
+    <a href="{{ url_for('auth.settings') }}" class="nav-item {% if 'settings' in request.endpoint|default('') or 'auth' in request.endpoint|default('') %}active{% endif %}">
+      <span class="nav-icon">&#9881;</span>
+      <span class="nav-label">Settings</span>
+    </a>
+  </nav>
+</body>
+</html>

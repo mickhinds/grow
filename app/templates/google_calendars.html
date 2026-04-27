@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Calendars — Grow{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('auth.settings') }}" class="back-link">&larr; Settings</a>
+<div class="page-title">Choose calendars</div>
+
+<div class="card">
+  <div class="card-label">Your Google Calendars</div>
+  <div class="text-sm text-muted mb-16">
+    Select which calendars Grow should read. We only see event times and titles
+    — used for personalized nudges, never stored beyond today.
+  </div>
+
+  <form method="POST" action="{{ url_for('auth.google_calendars_save') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {% for cal in calendars %}
+    <label style="display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); cursor:pointer;">
+      <input type="checkbox" name="calendars" value="{{ cal.id }}"
+             {% if cal.id in selected or (cal.primary and not selected) %}checked{% endif %}
+             style="width:20px; height:20px; accent-color:var(--green);">
+      <span>
+        <span style="font-weight:600;">{{ cal.name }}</span>
+        {% if cal.primary %}<span class="text-sm text-muted"> (primary)</span>{% endif %}
+        <br><span class="text-sm text-muted">{{ cal.id|truncate(40) }}</span>
+      </span>
+      <span style="width:12px; height:12px; border-radius:50%; background:{{ cal.color }}; flex-shrink:0; margin-left:auto;"></span>
+    </label>
+    {% endfor %}
+
+    {% if not calendars %}
+    <div class="text-muted">No calendars found. Make sure your Google account has calendars.</div>
+    {% endif %}
+
+    <button type="submit" class="btn btn-primary btn-block mt-16">Save &amp; sync</button>
+  </form>
+</div>
+{% endblock %}

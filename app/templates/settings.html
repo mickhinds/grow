@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}Settings — Grow{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('dashboard.index') }}" class="back-link">&larr; Dashboard</a>
+<div class="page-title">Settings</div>
+
+<form method="POST" action="{{ url_for('auth.settings_save') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <!-- Oura connection -->
+  <div class="card card-green">
+    <div class="card-label">Oura Ring</div>
+
+    {% if user.oura_pat or user.oura_access_token %}
+      <div class="stat-value stat-value-good mb-8">Connected</div>
+      <div class="text-sm text-muted mb-8">
+        {% if user.oura_pat %}via Personal Access Token{% else %}via OAuth{% endif %}
+      </div>
+      <form method="POST" action="{{ url_for('auth.oura_disconnect') }}" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-sm btn-ghost">Disconnect</button>
+      </form>
+    {% else %}
+      <div class="stat-value stat-value-warn mb-8">Not connected</div>
+    {% endif %}
+
+    <div class="form-group mt-16">
+      <label class="form-label" for="oura_pat">Personal Access Token</label>
+      <input type="password" name="oura_pat" id="oura_pat" class="form-input"
+             value=""
+             placeholder="{{ '••••••••' if user.oura_pat else 'Paste your token here' }}"
+             maxlength="2000" autocomplete="off">
+      {% if user.oura_pat %}
+      <div class="form-hint">Token is saved. Leave blank to keep current value.</div>
+      {% else %}
+      <div class="form-hint">
+        Go to <strong>cloud.ouraring.com</strong> &rarr; sign in &rarr;
+        Personal Access Tokens &rarr; Create New Token.
+        Check all the scopes and copy the token here.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- OAuth (advanced, collapsed) -->
+  <details class="card" style="cursor:pointer;">
+    <summary class="card-label" style="margin-bottom:0;">
+      Advanced: OAuth2 setup (for multi-user apps)
+    </summary>
+    <div class="text-sm text-muted mt-8 mb-16">
+      Only needed if you're building for other users. For your own data,
+      the Personal Access Token above is all you need.
+    </div>
+
+    {% if user.oura_access_token and not user.oura_pat %}
+      <div class="stat-value stat-value-good mb-8">OAuth connected</div>
+      <form method="POST" action="{{ url_for('auth.oura_disconnect') }}" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-sm btn-ghost mb-16">Disconnect</button>
+      </form>
+    {% elif user.oura_client_id %}
+      <a href="{{ url_for('auth.oura_start') }}" class="btn btn-sm btn-outline mb-16">Connect via OAuth</a>
+    {% endif %}
+
+    <div class="form-group">
+      <label class="form-label" for="oura_client_id">Client ID</label>
+      <input type="text" name="oura_client_id" id="oura_client_id" class="form-input"
+             value="{{ user.oura_client_id or '' }}"
+             placeholder="Oura OAuth Client ID" maxlength="300">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="oura_client_secret">Client Secret</label>
+      <input type="password" name="oura_client_secret" id="oura_client_secret" class="form-input"
+             value=""
+             placeholder="{{ '••••••••' if user.oura_client_secret else 'Oura OAuth Client Secret' }}"
+             maxlength="200" autocomplete="off">
+      {% if user.oura_client_secret %}
+      <div class="form-hint">Secret is saved. Leave blank to keep current value.</div>
+      {% endif %}
+    </div>
+  </details>
+
+  <!-- Google Calendar -->
+  <div class="card card-blue">
+    <div class="card-label">Google Calendar</div>
+
+    {% if user.google_access_token %}
+      <div class="stat-value stat-value-good mb-8">Connected</div>
+      {% if user.google_calendar_ids %}
+      <div class="text-sm text-muted mb-8">
+        Syncing {{ user.google_calendar_ids.split(',')|length }} calendar{{ 's' if user.google_calendar_ids.split(',')|length > 1 }}
+      </div>
+      {% endif %}
+      <div class="btn-row">
+        <a href="{{ url_for('auth.google_calendars') }}" class="btn btn-sm btn-outline">Choose calendars</a>
+        <form method="POST" action="{{ url_for('auth.google_disconnect') }}" style="display:inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-sm btn-ghost">Disconnect</button>
+        </form>
+      </div>
+    {% else %}
+      <div class="stat-value stat-value-warn mb-8">Not connected</div>
+      <div class="text-sm text-muted mb-8">
+        Connect Google Calendar to get personalized nudges based on your day.
+        Read-only — Grow never creates or changes events.
+      </div>
+
+      <div class="form-group mt-16">
+        <label class="form-label" for="google_client_id">Google Client ID</label>
+        <input type="text" name="google_client_id" id="google_client_id" class="form-input"
+               value="{{ user.google_client_id or '' }}"
+               placeholder="From Google Cloud Console" maxlength="300">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="google_client_secret">Google Client Secret</label>
+        <input type="password" name="google_client_secret" id="google_client_secret" class="form-input"
+               value=""
+               placeholder="{{ '••••••••' if user.google_client_secret else 'From Google Cloud Console' }}"
+               maxlength="200" autocomplete="off">
+        {% if user.google_client_secret %}
+        <div class="form-hint">Secret is saved. Leave blank to keep current value.</div>
+        {% endif %}
+      </div>
+
+      <details style="margin-top:8px;">
+        <summary class="text-sm" style="cursor:pointer; color:var(--muted); font-weight:600;">
+          How to get Google Calendar credentials
+        </summary>
+        <div class="text-sm text-muted" style="margin-top:8px; line-height:1.6;">
+          1. Go to <strong>console.cloud.google.com</strong><br>
+          2. Create a project (or use an existing one)<br>
+          3. Enable the <strong>Google Calendar API</strong><br>
+          4. Go to <strong>Credentials</strong> → Create <strong>OAuth 2.0 Client ID</strong><br>
+          5. Application type: <strong>Web application</strong><br>
+          6. Add redirect URI: <strong>http://localhost:8080/auth/google/callback</strong><br>
+          7. Copy the Client ID and Client Secret here<br>
+          8. Save settings, then click "Connect Google Calendar" below
+        </div>
+      </details>
+
+      {% if user.google_client_id %}
+      <a href="{{ url_for('auth.google_start') }}" class="btn btn-primary btn-block mt-16">Connect Google Calendar</a>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <!-- Profile -->
+  <div class="card">
+    <div class="card-label">Profile</div>
+
+    <div class="form-group">
+      <label class="form-label" for="name">Name</label>
+      <input type="text" name="name" id="name" class="form-input"
+             value="{{ user.name }}" maxlength="100">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="target_weight">Target weight (kg)</label>
+      <input type="number" step="0.5" name="target_weight" id="target_weight" class="form-input"
+             value="{{ user.target_weight_kg or '' }}"
+             placeholder="e.g. 75" min="30" max="300">
+    </div>
+  </div>
+
+  <!-- IF window -->
+  <div class="card">
+    <div class="card-label">Intermittent fasting window</div>
+
+    <div class="form-group">
+      <label class="form-label" for="if_start">Eating starts</label>
+      <input type="time" name="if_start" id="if_start" class="form-input"
+             value="{{ user.if_start or '11:00' }}">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="if_end">Eating ends</label>
+      <input type="time" name="if_end" id="if_end" class="form-input"
+             value="{{ user.if_end or '19:00' }}">
+    </div>
+  </div>
+
+  <!-- Activity -->
+  <div class="card">
+    <div class="card-label">Activity targets</div>
+
+    <div class="form-group">
+      <label class="form-label" for="step_target">Daily step target</label>
+      <input type="number" name="step_target" id="step_target" class="form-input"
+             value="{{ user.step_target or 8000 }}" min="1000" max="50000">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="weekly_training_target">Weekly training sessions</label>
+      <input type="number" name="weekly_training_target" id="weekly_training_target" class="form-input"
+             value="{{ user.weekly_training_target or 2 }}" min="1" max="14">
+      <div class="form-hint">How many exercise sessions per week you're aiming for</div>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary btn-block">Save settings</button>
+</form>
+
+<div class="mt-16 text-center">
+  <a href="{{ url_for('auth.status') }}" class="text-sm text-muted">Connection debug info</a>
+</div>
+{% endblock %}

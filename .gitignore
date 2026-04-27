@@ -1,0 +1,13 @@
+.env
+*.db
+data/
+__pycache__/
+venv/
+*.pem
+.secret_key
+logs/
+token.json
+credentials.json
+*.pyc
+.DS_Store
+*.bak

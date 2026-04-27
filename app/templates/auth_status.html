@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Connections — Grow{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('dashboard.index') }}" class="back-link">&larr; Dashboard</a>
+<div class="page-title">Connections</div>
+
+<div class="card">
+  <div class="card-label">Oura Ring</div>
+  {% if user.oura_pat %}
+    <div class="stat-value stat-value-good">Connected (Personal Token)</div>
+    <div class="text-sm text-muted mt-8">Using Personal Access Token</div>
+    <a href="{{ url_for('auth.oura_disconnect') }}" class="btn btn-sm btn-ghost mt-8" style="display:inline-block;">Disconnect</a>
+  {% elif user.oura_access_token %}
+    <div class="stat-value stat-value-good">Connected (OAuth)</div>
+    <div class="text-sm text-muted mt-8">
+      Token expires: {{ user.oura_token_expires_at|int if user.oura_token_expires_at else 'unknown' }}
+    </div>
+    <a href="{{ url_for('auth.oura_disconnect') }}" class="btn btn-sm btn-ghost mt-8" style="display:inline-block;">Disconnect</a>
+  {% else %}
+    <div class="stat-value stat-value-warn">Not connected</div>
+    <div class="text-sm text-muted mt-8">Go to <a href="{{ url_for('auth.settings') }}">Settings</a> to add your Personal Access Token</div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-label">Google Calendar</div>
+  {% if user.google_access_token %}
+    <div class="stat-value stat-value-good">Connected</div>
+    {% if user.google_calendar_ids %}
+    <div class="text-sm text-muted mt-8">
+      Syncing: {{ user.google_calendar_ids }}
+    </div>
+    {% endif %}
+    <a href="{{ url_for('auth.google_disconnect') }}" class="btn btn-sm btn-ghost mt-8" style="display:inline-block;">Disconnect</a>
+  {% else %}
+    <div class="stat-value stat-value-warn">Not connected</div>
+    <div class="text-sm text-muted mt-8">Go to <a href="{{ url_for('auth.settings') }}">Settings</a> to connect Google Calendar</div>
+  {% endif %}
+</div>
+{% endblock %}
