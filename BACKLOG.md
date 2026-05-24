@@ -1,6 +1,6 @@
 # Grow — Backlog
 
-Last updated: 2026-04-08
+Last updated: 2026-05-24
 
 ## Done (this session)
 
@@ -15,6 +15,9 @@ Last updated: 2026-04-08
 - [x] "Had a sweet" reason field with expandable UI
 - [x] Movement nudge after sweets (gentle, not punitive)
 - [x] **Security audit & code review** (see results below)
+- [x] **Raspberry Pi 5 deployment** — OS installed, app deployed, systemd service running, SSH key auth configured
+- [x] **GitHub repo** — https://github.com/mickhinds/grow (public)
+- [x] **Concept document v2** — Full redesign around three phases, curious tone, micro-habits, plate model, local AI (see CONCEPT.md)
 
 ---
 
@@ -48,13 +51,16 @@ Last updated: 2026-04-08
 
 ## Infrastructure / Deployment
 
-- [ ] **Raspberry Pi 5 setup** — Install OS, deploy Grow, set up systemd service for auto-start, configure cron job for 7 AM daily sync
+- [x] **Raspberry Pi 5 setup** — Deployed on hallonpaj1 (192.168.50.16:8080), systemd service, SSH key auth
+- [x] **GitHub repo** — https://github.com/mickhinds/grow (public, .gitignore protects secrets)
+- [x] **Install flask-wtf on Pi** — Done as part of Pi deployment
 - [ ] **Tailscale** — Install on Pi + phone + Mac for secure access from anywhere, real HTTPS certificates, no port forwarding
 - [ ] **Caddy reverse proxy** — Run on Pi in front of Flask, handles HTTPS via Tailscale certs
-- [ ] **Google Calendar redirect URI** — Update to Tailscale hostname once Pi is running
-- [ ] **Backfill Oura history** — Run `python3 scripts/sync_oura.py --backfill` once Pi is set up to pull historical data
+- [ ] **Google Calendar redirect URI** — Update to Tailscale hostname once Tailscale is running
+- [ ] **Backfill Oura history** — Run `python3 scripts/sync_oura.py --backfill` to pull historical data
 - [ ] **Oura API agreement** — Review compliance requirements for personal use
-- [ ] **Install flask-wtf on Pi** — `pip install flask-wtf` (new dependency from security audit)
+- [ ] **Install Ollama on Pi** — Local AI runtime for Ministral 3B (see CONCEPT.md section 9)
+- [ ] **Cron job for daily sync** — 7 AM daily Oura sync via `scripts/sync_oura.py`
 
 ---
 
@@ -67,15 +73,42 @@ Last updated: 2026-04-08
 
 ---
 
-## Features
+## Concept v2 Features (see CONCEPT.md for full design)
 
-- [ ] **Guided setup / onboarding** — First-run wizard to set goals (target weight, training schedule, IF window), connect Oura, connect Google Calendar. Currently everything is manual in Settings
-- [ ] **AI-powered analysis** — "What's keeping you stuck?" — analyze patterns across sleep, steps, IF adherence, sweet triggers, training consistency. Surface insights like "You tend to skip IF on days with 4+ meetings" or "Your sweet cravings peak on low-sleep days". **Plan: local AI model (Ollama with Llama or Mistral) running on the Raspberry Pi**, keeping all data private and offline.
-- [ ] **Better Oura data overview** — Dedicated view showing trends: sleep score over time, step averages, HRV trends, readiness patterns. Currently only shows yesterday's snapshot
-- [ ] **Conversational interface** — Instead of just cards and buttons, a more chat-like interaction. Morning check-in ("How are you feeling?"), contextual questions, encouragement that feels personal rather than generic
-- [ ] **Sweet trigger patterns** — Analyze the "circumstance" notes over time and surface recurring themes (stress, social, time of day, specific situations)
-- [ ] **Weekly motivation digest** — Once a week, show a summary of "chose not to" motivations alongside sweet circumstances. What strategies are working? When do you cave? This is gold for the AI analysis feature — feed these notes to the local model for personalized pattern insights.
-- [ ] **Feed motivation/circumstance notes to AI** — Both the sweet reasons and skip motivations are key input for the AI-powered analysis. The local model (Ollama) could correlate these with sleep, calendar, steps data to surface actionable insights like "Walking helps you resist — you skip sweets 3x more often on 8k+ step days"
+### Phase System
+- [ ] **Three-phase engine** — Build Routine → Harvest → Adapt. Phase detection based on consistency metrics and disruption events. Phase transitions with user confirmation.
+- [ ] **Phase-aware UI** — Dashboard adapts to current phase: generous in Phase 1, trend-focused in Phase 2, gentle in Phase 3. Garden visual reflects phase (spring/summer/autumn).
+
+### Micro-Habits
+- [x] **Micro-habit system** — Daily suggestions (1–3) drawn from rule-based context-aware pool. Movement, nutrition, recovery, awareness, adapted training. Each earns 1 seed. Dedicated section on dashboard.
+- [x] **Micro-habit database** — Pool of 24 micro-habits tagged by category and context flags (low steps, poor sleep, busy/light day, non-training day). Seeded on startup.
+- [ ] **Phase-aware micro-habits** — Adjust suggestion pool and frequency based on current phase. More generous in Phase 1, supplement in Phase 2, anchor in Phase 3.
+- [ ] **Disruption-adapted micro-habits** — Filter pool based on active disruptions (injury, stress). E.g., no kettlebell swings with knee injury.
+
+### Nutrition
+- [ ] **Plate model UI** — Simple meal proportion selector (tallriksmodellen). Four-tap interface: mostly balanced / heavy carbs / skipped vegetables / great plate.
+- [ ] **Plate model tracking** — Store meal assessments, surface patterns over time via AI.
+
+### Weekly Reflection
+- [ ] **Weekly reflection engine** — Three-part structure: week in numbers (AI-selected highlights), smart questions (AI-generated from data), next week plan (calendar + patterns). Sunday evening or Monday morning.
+- [ ] **Reflection storage** — Store answers, feed them back to AI for longitudinal patterns.
+
+### Disruption Tracking
+- [ ] **Disruption logging** — Structured entry: injury (body part, severity, can-still-do, timeline), work stress (duration, impact areas), illness, travel. Creates timeline with reassessment points.
+- [ ] **Adapted programs** — Auto-adjust targets based on disruption type. Reduced step goals, alternative exercises, micro-habits only mode.
+- [ ] **Recovery arc** — Lifecycle: acute → adaptation → reintegration → resolved. Gradual return to Phase 1/2.
+
+### AI / Local Intelligence
+- [ ] **Ollama + Ministral 3B setup** — Install on Pi, configure HTTP API, test inference speed. Also install nomic-embed-text for embeddings and sqlite-vec for vector storage.
+- [ ] **Agent network** — Five sequential agents: Data Summarizer, Pattern Finder, Question Generator, Nudge Composer, Adaptation Advisor. Each with focused prompt and structured output.
+- [ ] **Morning notification** — Daily data-informed message composed by Nudge Composer agent. Phase-aware, calendar-aware.
+- [ ] **AI insights on dashboard** — Pattern observations surfaced from Agent 2, displayed as cards.
+
+### Existing Features (carried forward)
+- [ ] **Guided setup / onboarding** — First-run wizard for goals, Oura, Google Calendar
+- [ ] **Better Oura data overview** — Trend views: sleep score, step averages, HRV, readiness over time
+- [ ] **Sweet trigger patterns** — AI analysis of circumstance notes over time
+- [ ] **Conversational interface** — Chat-like interaction (deferred, depends on local AI reliability)
 
 ---
 
@@ -100,8 +133,10 @@ Last updated: 2026-04-08
 
 ## Notes
 
-- Running locally on Mac (port 8080) until Pi is set up
-- Google Calendar OAuth redirect must use localhost, not private IP
+- Running on Pi (hallonpaj1, 192.168.50.16:8080) via systemd. Mac used for development.
+- Google Calendar OAuth redirect must use localhost on Mac, will switch to Tailscale hostname
 - Oura PAT doesn't expire — no maintenance needed
 - Database auto-migrates on startup — safe to add new fields without data loss
-- Local AI model for pattern analysis: Ollama is a good fit for Pi (runs Llama 3, Mistral, etc. locally). Can feed it aggregated data from the last 30 days and ask for pattern insights. No data leaves the device.
+- Local AI: Ollama + Ministral 3B (Q4_K_M quantization) on Pi, 4 GB RAM. nomic-embed-text for embeddings, sqlite-vec for vector storage. All inference local, no data leaves device.
+- Concept document v2 (CONCEPT.md) is the design ground for all new features
+- Leading design principle: **the tone is curious**

@@ -22,6 +22,10 @@ def create_app(config_class=Config):
         auto_migrate(app)  # Add any missing columns (no more "rm grow.db"!)
         init_default_user(app)
 
+        # Seed micro-habit pool (safe to call multiple times)
+        from app.services.micro_habits import seed_micro_habit_pool
+        seed_micro_habit_pool()
+
     # Security headers
     @app.after_request
     def set_security_headers(response):

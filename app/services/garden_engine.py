@@ -10,7 +10,7 @@ from typing import Optional
 
 from app.models import (
     db, User, OuraDaily, IFSession, FoodLog, Workout,
-    GardenState, GardenHistory,
+    GardenState, GardenHistory, MicroHabitCompletion,
 )
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ SEEDS_SLEEP_GREAT = 1          # Bonus for 85+
 SEEDS_TRAINING = 4             # Kettlebell session
 SEEDS_LOGGED_SWEET = 1         # Awareness: logged a sweet
 SEEDS_CHOSE_NOT_TO = 2         # Conscious skip
+SEEDS_MICRO_HABIT = 1          # Each micro-habit completion
 SEEDS_STREAK_7 = 5             # 7-day streak bonus
 
 # Level thresholds (cumulative seeds to reach each level)
@@ -42,6 +43,7 @@ def calculate_seeds_for_day(user: User, day: date) -> dict:
         "seeds_sleep": 0,
         "seeds_training": 0,
         "seeds_awareness": 0,
+        "seeds_micro_habits": 0,
         "seeds_bonus": 0,
     }
 
@@ -98,6 +100,12 @@ def calculate_seeds_for_day(user: User, day: date) -> dict:
             seeds["seeds_awareness"] += SEEDS_CHOSE_NOT_TO
         elif entry.category in ("sweet", "snack"):
             seeds["seeds_awareness"] += SEEDS_LOGGED_SWEET
+
+    # --- Micro-habits ---
+    micro_completions = MicroHabitCompletion.query.filter_by(
+        user_id=user.id, date=day, completed=True
+    ).count()
+    seeds["seeds_micro_habits"] = micro_completions * SEEDS_MICRO_HABIT
 
     # --- Streaks ---
     seeds["seeds_bonus"] = _calculate_streak_bonus(user, day)

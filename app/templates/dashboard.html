@@ -150,6 +150,39 @@
   {% endif %}
 </div>
 
+<!-- Today's micro-habits -->
+{% if micro_habits %}
+{% set done = micro_habits|selectattr('completed')|list %}
+<div class="card micro-habits-card">
+  <div class="card-label">Today's micro-habits</div>
+  {% if done|length == micro_habits|length %}
+  <div class="micro-all-done">All done today. Every small action matters.</div>
+  {% endif %}
+  {% for habit in micro_habits %}
+  <div class="micro-habit-item {% if habit.completed %}micro-completed{% endif %}{% if habit.dismissed %} micro-dismissed{% endif %}">
+    <div class="micro-habit-text">
+      <span class="micro-category micro-{{ habit.category }}">{{ habit.category }}</span>
+      {{ habit.text }}
+    </div>
+    {% if not habit.completed and not habit.dismissed %}
+    <div class="micro-habit-actions">
+      <form method="POST" action="{{ url_for('tracking.micro_habit_complete', completion_id=habit.completion_id) }}" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-sm btn-outline micro-done-btn">Done</button>
+      </form>
+      <form method="POST" action="{{ url_for('tracking.micro_habit_dismiss', completion_id=habit.completion_id) }}" style="margin:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn-micro-skip">skip</button>
+      </form>
+    </div>
+    {% elif habit.completed %}
+    <div class="micro-habit-badge">+1</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <!-- Today's schedule (if Google Calendar connected) -->
 {% if google_connected and today_events %}
 <div class="card card-blue">

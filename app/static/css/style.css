@@ -597,6 +597,88 @@ textarea.form-input {
   letter-spacing: 0.02em;
 }
 
+/* --- Micro-habits --- */
+.micro-habits-card {
+  border-left: 4px solid var(--green);
+}
+.micro-habit-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  gap: 10px;
+}
+.micro-habit-item + .micro-habit-item {
+  border-top: 1px solid var(--border);
+}
+.micro-habit-text {
+  flex: 1;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.micro-completed .micro-habit-text {
+  color: var(--light);
+  text-decoration: line-through;
+  text-decoration-color: var(--green-mist);
+}
+.micro-dismissed {
+  display: none;
+}
+.micro-category {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 6px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.micro-movement { background: var(--green-light); color: var(--green); }
+.micro-nutrition { background: var(--amber-light); color: var(--amber-dark); }
+.micro-recovery { background: var(--blue-light); color: var(--blue-dark); }
+.micro-awareness { background: var(--purple-light); color: var(--purple); }
+.micro-training { background: #e8e3ed; color: var(--purple); }
+.micro-habit-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.micro-done-btn {
+  padding: 6px 12px !important;
+  min-height: 34px !important;
+  font-size: 0.78rem !important;
+}
+.btn-micro-skip {
+  background: none;
+  border: none;
+  color: var(--light);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.btn-micro-skip:active { color: var(--muted); }
+.micro-habit-badge {
+  display: inline-block;
+  background: var(--green-light);
+  color: var(--green);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.micro-all-done {
+  font-size: 0.84rem;
+  color: var(--green);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
 /* Movement card extras */
 .movement-grid {
   display: grid;

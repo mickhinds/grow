@@ -7,8 +7,9 @@ from datetime import date, datetime, timedelta
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 
-from app.models import db, User, WeightTracking, IFSession, FoodLog, Workout
+from app.models import db, User, WeightTracking, IFSession, FoodLog, Workout, MicroHabitCompletion
 from app.services.garden_engine import update_garden
+from app.services.micro_habits import complete_micro_habit, dismiss_micro_habit
 
 bp = Blueprint("tracking", __name__)
 
@@ -337,4 +338,31 @@ def exercise_quick_log():
 
     update_garden(1, today)
     flash(f"{activity_type} session logged!", "success")
+    return redirect(url_for("dashboard.index"))
+
+
+# --- Micro-habits ---
+
+@bp.route("/micro-habit/complete/<int:completion_id>", methods=["POST"])
+def micro_habit_complete(completion_id):
+    """Complete a micro-habit. Earns 1 seed."""
+    completion = db.session.get(MicroHabitCompletion, completion_id)
+    if not completion:
+        flash("Micro-habit not found.", "error")
+        return redirect(url_for("dashboard.index"))
+
+    if complete_micro_habit(completion_id):
+        flash("Done! +1 seed for showing up.", "success")
+    else:
+        flash("Already completed.", "info")
+
+    return redirect(url_for("dashboard.index"))
+
+
+@bp.route("/micro-habit/dismiss/<int:completion_id>", methods=["POST"])
+def micro_habit_dismiss(completion_id):
+    """Dismiss a micro-habit suggestion. No judgement."""
+    if dismiss_micro_habit(completion_id):
+        flash("Skipped — no worries.", "info")
+
     return redirect(url_for("dashboard.index"))

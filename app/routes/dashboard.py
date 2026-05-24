@@ -12,6 +12,7 @@ from app.models import (
 )
 from app.services.garden_engine import get_level_progress
 from app.services.google_calendar import analyze_day
+from app.services.micro_habits import get_todays_micro_habits
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +194,9 @@ def index():
         if today_events:
             day_analysis = analyze_day(1, today)
 
+    # Micro-habits for today
+    micro_habits = get_todays_micro_habits(user.id, today)
+
     # Movement nudge logic (now calendar-aware)
     movement_nudge = _get_movement_nudge(user, today, workouts_this_week, day_analysis)
 
@@ -224,6 +228,7 @@ def index():
         workouts_this_week=workouts_this_week,
         recent_workouts=recent_workouts,
         movement_nudge=movement_nudge,
+        micro_habits=micro_habits,
         google_connected=google_connected,
         today_events=today_events,
         day_analysis=day_analysis,
