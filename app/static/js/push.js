@@ -81,8 +81,8 @@
     });
   }
 
-  // Register service worker
-  navigator.serviceWorker.register('/static/sw.js')
+  // Register service worker from root (scope: /) for full push support
+  navigator.serviceWorker.register('/sw.js')
     .then(function(registration) {
       console.log('Service worker registered.');
 

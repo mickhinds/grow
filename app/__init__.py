@@ -1,6 +1,6 @@
 """Grow — Flask app factory."""
 
-from flask import Flask
+from flask import Flask, send_from_directory, jsonify
 from flask_wtf.csrf import CSRFProtect
 from config import Config
 from app.models import db, init_default_user
@@ -36,6 +36,27 @@ def create_app(config_class=Config):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         return response
+
+    # Serve service worker from root (scope must be / for push on all browsers)
+    @app.route("/sw.js")
+    def service_worker():
+        response = send_from_directory(app.static_folder, "sw.js")
+        response.headers["Content-Type"] = "application/javascript"
+        response.headers["Service-Worker-Allowed"] = "/"
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+    # Web app manifest (required by Firefox Android for push)
+    @app.route("/manifest.json")
+    def manifest():
+        return jsonify({
+            "name": "Grow",
+            "short_name": "Grow",
+            "start_url": "/",
+            "display": "standalone",
+            "background_color": "#f5f3ef",
+            "theme_color": "#3d6b4f",
+        })
 
     # Register routes
     from app.routes.dashboard import bp as dashboard_bp
