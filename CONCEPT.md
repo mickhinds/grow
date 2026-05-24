@@ -288,7 +288,89 @@ The garden reflects real conditions:
 
 ---
 
-## 9. Local AI: Architecture
+## 9. The Morning View: Dashboard Design
+
+The dashboard is the daily touchpoint. It's the moment the person decides whether to engage or close the app. This means it has one job: make engagement feel effortless and worthwhile.
+
+### Design Principle: Garden Hero, Interaction Queen
+
+The garden is the emotional center — the first thing you see, filling the screen. Not a card among twelve. The whole view. You open Grow and you see your garden. It's a little different from yesterday. Something grew. That's the moment.
+
+But emotion without action is passive. The interaction layer — the status sentence, the micro-habits, the focus question — is what turns a glance into a choice. The garden draws you in. The interaction gives you something to do.
+
+### The Morning View (Default State)
+
+The dashboard shows exactly five things, in this order:
+
+**1. The Garden (hero)**
+Full-width visual scene. Phase indicator visible as a subtle label or arc: "Building routine · Week 3" or "Adapting · Day 5." A seed counter or "+8 seeds yesterday" animation that gives concrete progress signal. The garden visual sets mood — but the phase indicator and seed count are the legible progress signals.
+
+**2. Status Sentence**
+One line. Composed from yesterday's data, today's calendar, active disruptions, and the weekly focus. This is the voice of the app — the curious tone made concrete in a single sentence.
+
+Rule-based examples (until AI takes over):
+- "9,200 steps yesterday, IF on track. Light calendar today — good for kettlebells?"
+- "Rough sleep last night, full schedule. Small actions count today."
+- "Knee's healing, day 8. Walking and upper body — that's plenty."
+- "Been a few days. Pick one thing and let's go."
+- "Third week of consistent steps. Something's clicking."
+
+When Ministral 3B runs, this slot gets an AI-composed sentence from the Nudge Composer agent. The UI doesn't change at all — the intelligence behind the sentence just deepens.
+
+**3. Weekly Focus**
+A single highlighted area: "This week: steps consistency" or "This week: sleep before midnight." Chosen by the user weekly (the app suggests based on data, the user confirms). Everything else in the UI takes a back seat to this focus.
+
+If no focus is set, the app gently asks: "What matters most this week?" with 3–4 data-informed options to tap.
+
+The focus concept solves two problems: it reduces cognitive load (you know what to care about today), and it gives the AI a lens for all its output (patterns, nudges, and reflections all orient around the focus).
+
+**4. Today's Micro-Habits**
+Two or three contextual suggestions. One-tap completion. Filtered by disruptions, phase, and weekly focus.
+
+**5. Quick Log**
+IF status (tap to confirm), sweet/skip buttons. Minimal, expandable.
+
+That's it. Five elements. Thirty seconds to engage.
+
+### Progressive Disclosure: Everything Else
+
+All detailed metrics — sleep breakdown, step history, exercise log, weight trend, calendar view — live one tap deeper. Not hidden. Not removed. Just not competing for the morning view.
+
+These detailed views surface automatically in exactly one case: **anomalies.** If a metric deviates significantly from the user's recent average, it appears as a card on the dashboard. "Sleep score 45 — that's unusual for you" or "Already at 9,000 steps by 2 PM — on a roll." Anomalies are interesting. Interesting earns a place on the morning view. Normal doesn't.
+
+The anomaly threshold is personal: calculated from the user's own rolling 14-day average. What's unusual for Micke isn't unusual for someone else. This is the curious tone applied to data display: the app notices what's different, not what's expected.
+
+### Notifications and Nudges
+
+**Morning nudge (9:00 AM):** If the user hasn't opened the app today, send a push notification. Content: yesterday's highlight + today's focus. "Your oak grew yesterday — 5 days of IF. What matters today?" One tap opens the morning view.
+
+**Technical path:** Web Push API via service worker. The Pi has HTTPS (Caddy + Tailscale certs), which is the prerequisite. A cron job at 9:00 checks `last_visited` and triggers a push via the web-push Python library using stored VAPID keys and the browser's push subscription.
+
+**Inactivity nudge (after 2–3 days):** The tone shifts from "here's your data" to "wondering about you." "It's been a few days. Everything okay, or is something going on?" with a one-tap path to logging a disruption. This turns silence from a failure state into useful information.
+
+**No evening notifications.** Evenings are for rest. If the user opens the app in the evening, the view is calm: "Good day. +8 seeds. Rest well." No prompts, no logging suggestions.
+
+### Phase-Adaptive Dashboard
+
+The morning view adapts to the current phase:
+
+**Phase 1 (Build Routine):** Garden in spring colors. Status sentence focuses on showing up, not performance. Micro-habits are generous and simple. Anomaly cards are rare — the user is still establishing baselines. Focus suggestions are about consistency: "This week: log something every day."
+
+**Phase 2 (Harvest):** Garden in full summer. Status sentence references trends and patterns. Anomaly cards appear when the AI spots something interesting. Focus suggestions target improvement: "This week: hit step target 5 out of 7 days."
+
+**Phase 3 (Adapt):** Garden in autumn/winter mode — warm, quiet, still alive. Status sentence acknowledges the disruption and what's still possible. Micro-habits filter to what the disruption allows. Focus is about maintaining connection: "This week: one small thing each day."
+
+### Why This Design
+
+The previous dashboard had twelve cards: garden, calendar, movement, sleep, IF, exercise, nudge, weight, quick log, insight, micro-habits, streaks. Each individually useful. Together, they created a report — not a morning moment. The cognitive load contradicted the curious tone.
+
+The redesigned view asks: "What does this person need to see right now?" and shows only that. The answer depends on the phase, the data, and the focus. A person in Phase 1 needs encouragement and simplicity. A person in Phase 2 needs trends and insight. A person in Phase 3 needs gentleness and connection.
+
+This aligns with the core behavior science insight: people succeed when they change one or two things at a time, not six. The focus system operationalizes this. The progressive disclosure enforces it. The garden makes it feel good.
+
+---
+
+## 10. Local AI: Architecture
 
 All intelligence in Grow runs locally on the Raspberry Pi 5. No data leaves the device. This is a core design principle — a health app that sends your sleep, weight, and eating habits to the cloud is a health app you can't fully trust.
 
@@ -357,7 +439,7 @@ The user's data stays in their house, on their device, processed by an open-sour
 
 ---
 
-## 10. A Day in Grow
+## 11. A Day in Grow
 
 Here's what a typical day looks like across the three phases:
 
@@ -392,7 +474,7 @@ Same structure, but:
 
 ---
 
-## 11. Motivation Philosophy
+## 12. Motivation Philosophy
 
 Grow is built on three principles that guide every design decision. They come from Nordic cultural wisdom — practical, balanced, and humane — but they're expressed through behavior, never through labels or slogans.
 
@@ -412,7 +494,7 @@ These three principles create a system that's firm without being harsh, flexible
 
 ---
 
-## 12. Technical Summary
+## 13. Technical Summary
 
 ### Current Stack
 - **Backend:** Python 3.12, Flask 3.1, SQLAlchemy, SQLite
@@ -422,25 +504,35 @@ These three principles create a system that's firm without being harsh, flexible
 - **Deployment:** Raspberry Pi 5 (hallonpaj1), systemd, LAN access at 192.168.50.16:8080
 - **Source:** github.com/mickhinds/grow (public)
 
+### Built
+- **Tailscale + Caddy** — secure HTTPS remote access via hallonpaj1.tail745dc7.ts.net
+- **Micro-habit engine** — rule-based selection, 24 habits, context-aware, 1 seed per completion
+- **Disruption tracking** — structured logging (injury, stress, illness, travel, mental health), status lifecycle, dashboard banner
+- **Contextual greeting** — time-of-day + data-informed (sleep, readiness, calendar)
+- **Reset system** — three levels (recalibrate, start over, total reset) in Settings
+- **Day counter** — based on user.start_date, resets with start-over/recalibrate
+
 ### Planned Additions
-- **Tailscale** — secure remote access, real HTTPS
-- **Caddy** — reverse proxy with automatic TLS
+- **Dashboard redesign** — garden-hero morning view, status sentence, weekly focus, progressive disclosure (see section 9)
+- **Weekly focus system** — user-chosen weekly priority, data-informed suggestions
+- **Status sentence engine** — rule-based → AI-composed daily one-liner
+- **Anomaly detection** — surface metrics only when they deviate from personal baseline
+- **Web Push notifications** — 9 AM morning nudge, inactivity nudge, via service worker + VAPID
 - **Ollama + Ministral 3B** — local AI on the Pi, with nomic-embed-text for semantic retrieval via sqlite-vec
 - **Plate model UI** — simple meal proportion selector
 - **Weekly reflection engine** — data summary + AI questions + next-week plan
-- **Disruption tracking** — structured injury/stress logging with timeline
 
 ### Database Additions Needed
-- `MicroHabit` — daily suggestions and completions
-- `Disruption` — type, severity, timeline, active status
 - `WeeklyReflection` — answers, generated insights, next-week plan
 - `MealLog` — plate model assessments (replaces or extends FoodLog)
 - `AIInsight` — stored agent outputs for the dashboard
 - `Phase` tracking — current phase per user, transition history
+- `User.weekly_focus` — current focus area and week number
+- `PushSubscription` — browser push subscription data per user
 
 ---
 
-## 13. What's Not in Scope (Yet)
+## 14. What's Not in Scope (Yet)
 
 These ideas came up during design but are deferred:
 
@@ -452,7 +544,7 @@ These ideas came up during design but are deferred:
 
 ---
 
-## 14. The Name
+## 15. The Name
 
 Grow. A garden grows. A person grows. Habits grow. Understanding grows. The name works on every level. It's short, warm, and universal. It's not a medical term. It's not a fitness brand. It's a verb — an invitation.
 

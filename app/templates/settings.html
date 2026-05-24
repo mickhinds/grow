@@ -202,6 +202,54 @@
   <button type="submit" class="btn btn-primary btn-block">Save settings</button>
 </form>
 
+<!-- Reset / Start Over -->
+<div class="card" style="border-left: 3px solid var(--amber);">
+  <div class="card-label">Reset</div>
+
+  <details style="margin-bottom: 16px;">
+    <summary class="text-sm" style="cursor:pointer; font-weight:600; color:var(--muted);">
+      Recalibrate
+    </summary>
+    <div class="text-sm text-muted" style="margin-top:8px; margin-bottom:12px;">
+      Reset the day counter to Day 1. All your data, seeds, and garden stay.
+      Good for updating goals after a break.
+    </div>
+    <form method="POST" action="{{ url_for('auth.reset_recalibrate') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-sm btn-outline">Recalibrate</button>
+    </form>
+  </details>
+
+  <details style="margin-bottom: 16px;">
+    <summary class="text-sm" style="cursor:pointer; font-weight:600; color:var(--amber);">
+      Start over
+    </summary>
+    <div class="text-sm text-muted" style="margin-top:8px; margin-bottom:12px;">
+      Zero your seeds, garden, and day count. Oura data and weight history stay.
+      Use this to redefine your goals and start fresh.
+    </div>
+    <form method="POST" action="{{ url_for('auth.reset_start_over') }}" onsubmit="return confirm('Start over? Seeds and garden will be zeroed. Oura data stays.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-sm btn-outline" style="color:var(--amber); border-color:var(--amber);">Start over</button>
+    </form>
+  </details>
+
+  <details>
+    <summary class="text-sm" style="cursor:pointer; font-weight:600; color:#c0392b;">
+      Total data reset
+    </summary>
+    <div class="text-sm text-muted" style="margin-top:8px; margin-bottom:12px;">
+      Wipe everything — all tracking data, seeds, garden, disruptions.
+      Your connections (Oura, Google Calendar) and profile stay.
+      This cannot be undone.
+    </div>
+    <form method="POST" action="{{ url_for('auth.reset_total') }}" onsubmit="return confirm('Delete ALL tracking data? This cannot be undone.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-sm btn-outline" style="color:#c0392b; border-color:#c0392b;">Reset everything</button>
+    </form>
+  </details>
+</div>
+
 <div class="mt-16 text-center">
   <a href="{{ url_for('auth.status') }}" class="text-sm text-muted">Connection debug info</a>
 </div>

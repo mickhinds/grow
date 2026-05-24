@@ -43,6 +43,11 @@ class Config:
     GOOGLE_CALENDAR_API = "https://www.googleapis.com/calendar/v3"
     GOOGLE_SCOPES = "https://www.googleapis.com/auth/calendar.readonly"
 
+    # Web Push (VAPID) — generate keys with scripts/generate_vapid_keys.py
+    VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+    VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
+    VAPID_CLAIM_EMAIL = os.getenv("VAPID_CLAIM_EMAIL", "mailto:mikael.hindsberg@yle.fi")
+
     # Timezone
     TIMEZONE = os.getenv("TIMEZONE", "Europe/Helsinki")
 

@@ -30,6 +30,7 @@
   /* Supporting */
   --red: #b54a4a;             /* Muted red */
   --red-light: #f2e0e0;       /* Soft rose */
+  --red-dark: #8a3a3a;         /* Deep rose */
   --purple: #6b5b7b;          /* Dusk purple */
   --purple-light: #e8e3ed;    /* Lavender mist */
 
@@ -404,7 +405,7 @@ textarea.form-input {
 /* --- Setup banner --- */
 .setup-banner {
   background: var(--amber-light);
-  border: 1px solid #e8d5b8;
+  border: 1px solid var(--amber-light);
   border-radius: var(--radius);
   padding: 16px;
   margin-bottom: 12px;
@@ -445,6 +446,12 @@ textarea.form-input {
 }
 
 /* --- Visual Garden --- */
+.garden-hero {
+  padding: 12px 14px 14px;
+}
+.garden-visual-hero {
+  height: 180px;
+}
 .garden-visual {
   position: relative;
   height: 140px;
@@ -639,7 +646,7 @@ textarea.form-input {
 .micro-nutrition { background: var(--amber-light); color: var(--amber-dark); }
 .micro-recovery { background: var(--blue-light); color: var(--blue-dark); }
 .micro-awareness { background: var(--purple-light); color: var(--purple); }
-.micro-training { background: #e8e3ed; color: var(--purple); }
+.micro-training { background: var(--purple-light); color: var(--purple); }
 .micro-habit-actions {
   display: flex;
   align-items: center;
@@ -677,6 +684,237 @@ textarea.form-input {
   color: var(--green);
   font-weight: 500;
   margin-bottom: 6px;
+}
+
+/* --- Status sentence --- */
+.status-sentence {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--fg);
+  padding: 12px 4px;
+  margin: 0 0 4px;
+  font-style: italic;
+}
+
+/* --- Garden progress row --- */
+.garden-progress-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  gap: 8px;
+}
+.garden-seed-badge {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--green);
+  background: var(--green-light);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+.garden-level-badge {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.streak-pill {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--amber);
+  background: var(--amber-light);
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.streak-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* --- Weekly focus --- */
+.focus-card {
+  border-left: 3px solid var(--green);
+}
+.focus-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.focus-option-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+.focus-option-btn:active {
+  border-color: var(--green);
+  background: var(--green-light);
+}
+.focus-option-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+.focus-option-detail {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.focus-current {
+  font-size: 0.84rem;
+  color: var(--muted);
+  padding: 8px 4px;
+  margin-bottom: 4px;
+}
+.focus-current strong {
+  color: var(--green);
+}
+
+/* --- Quick log card --- */
+.quick-log-card {
+  padding: 12px 14px;
+}
+.quick-log-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.quick-log-if {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+/* --- Anomaly cards --- */
+.anomaly-card {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.anomaly-concern {
+  background: var(--amber-light);
+  border-left: 3px solid var(--amber);
+  color: var(--amber-dark);
+}
+.anomaly-good {
+  background: var(--green-light);
+  border-left: 3px solid var(--green);
+  color: var(--green-dark);
+}
+.anomaly-neutral {
+  background: var(--bg-warm);
+  border-left: 3px solid var(--border);
+}
+.anomaly-label {
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 6px;
+}
+
+/* --- Details section (progressive disclosure) --- */
+.details-section {
+  margin-top: 12px;
+}
+.details-summary {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  text-align: center;
+}
+.details-summary::-webkit-details-marker { display: none; }
+.details-arrow {
+  transition: transform 0.2s;
+  font-size: 0.7rem;
+}
+details[open] .details-arrow {
+  transform: rotate(180deg);
+}
+.details-section[open] .details-summary {
+  margin-bottom: 8px;
+  color: var(--fg);
+}
+
+/* --- Disruption inline (compact banner) --- */
+.disruption-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 4px;
+  margin-bottom: 4px;
+  font-size: 0.82rem;
+}
+
+/* Disruption styles */
+.disruption-banner {
+  border-left: 3px solid var(--amber);
+  padding: 10px 14px;
+}
+.disruption-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.84rem;
+}
+.disruption-type-badge {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.disruption-injury { background: var(--amber-light); color: var(--amber-dark); }
+.disruption-work_stress { background: var(--blue-light); color: var(--blue-dark); }
+.disruption-illness { background: var(--red-light); color: var(--red-dark); }
+.disruption-travel { background: var(--green-light); color: var(--green); }
+.disruption-mental_health { background: var(--purple-light); color: var(--purple); }
+.disruption-life_event { background: var(--purple-light); color: var(--purple); }
+.disruption-other { background: var(--bg-warm); color: var(--muted); }
+.disruption-summary { flex: 1; }
+.disruption-severity {
+  font-size: 0.7rem;
+  letter-spacing: -1px;
+  color: var(--amber);
+}
+.disruption-detail-card {
+  margin-bottom: 8px;
+}
+.check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.84rem;
+  color: var(--fg);
+  cursor: pointer;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.check-label input[type="checkbox"] {
+  margin: 0;
 }
 
 /* Movement card extras */

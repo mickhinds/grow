@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 
-from app.models import db, User, WeightTracking, IFSession, FoodLog, Workout, MicroHabitCompletion
+from app.models import db, User, WeightTracking, IFSession, FoodLog, Workout, MicroHabitCompletion, Disruption
 from app.services.garden_engine import update_garden
 from app.services.micro_habits import complete_micro_habit, dismiss_micro_habit
 
@@ -366,3 +366,130 @@ def micro_habit_dismiss(completion_id):
         flash("Skipped — no worries.", "info")
 
     return redirect(url_for("dashboard.index"))
+
+
+# --- Disruption tracking ---
+
+DISRUPTION_TYPES = [
+    ("injury", "Injury"),
+    ("work_stress", "Work stress"),
+    ("illness", "Illness"),
+    ("travel", "Travel"),
+    ("mental_health", "Mental health"),
+    ("life_event", "Life event"),
+    ("other", "Other"),
+]
+
+
+@bp.route("/disruptions")
+def disruptions():
+    """Disruption overview — active, past, and new entry."""
+    active = Disruption.query.filter(
+        Disruption.user_id == 1,
+        Disruption.status.in_(["active", "adapting", "recovering"]),
+    ).order_by(Disruption.created_at.desc()).all()
+
+    resolved = Disruption.query.filter_by(
+        user_id=1, status="resolved"
+    ).order_by(Disruption.actual_end.desc()).limit(10).all()
+
+    return render_template(
+        "disruptions.html",
+        active=active,
+        resolved=resolved,
+        disruption_types=DISRUPTION_TYPES,
+        today=date.today(),
+    )
+
+
+@bp.route("/disruptions/add", methods=["POST"])
+def disruption_add():
+    """Log a new disruption."""
+    disruption_type = request.form.get("disruption_type", "other").strip()
+    title = request.form.get("title", "").strip()[:200]
+    notes = request.form.get("notes", "").strip()
+    severity_str = request.form.get("severity", "3")
+    body_part = request.form.get("body_part", "").strip()[:100]
+    can_still_do = request.form.get("can_still_do", "").strip()
+    avoid = request.form.get("avoid", "").strip()
+    estimated_end_str = request.form.get("estimated_end", "").strip()
+
+    if not title:
+        flash("Give the disruption a short title.", "error")
+        return redirect(url_for("tracking.disruptions"))
+
+    try:
+        severity = max(1, min(5, int(severity_str)))
+    except ValueError:
+        severity = 3
+
+    estimated_end = None
+    if estimated_end_str:
+        try:
+            estimated_end = date.fromisoformat(estimated_end_str)
+        except ValueError:
+            pass
+
+    # Impact flags
+    affects_movement = "affects_movement" in request.form
+    affects_training = "affects_training" in request.form
+    affects_sleep = "affects_sleep" in request.form
+    affects_nutrition = "affects_nutrition" in request.form
+
+    disruption = Disruption(
+        user_id=1,
+        disruption_type=disruption_type,
+        title=title,
+        notes=notes if notes else None,
+        severity=severity,
+        body_part=body_part if body_part else None,
+        can_still_do=can_still_do if can_still_do else None,
+        avoid=avoid if avoid else None,
+        affects_movement=affects_movement,
+        affects_training=affects_training,
+        affects_sleep=affects_sleep,
+        affects_nutrition=affects_nutrition,
+        start_date=date.today(),
+        estimated_end=estimated_end,
+        status="active",
+    )
+    db.session.add(disruption)
+    db.session.commit()
+
+    flash(f"Disruption logged: {title}. Your garden adapts.", "info")
+    return redirect(url_for("tracking.disruptions"))
+
+
+@bp.route("/disruptions/<int:disruption_id>/update", methods=["POST"])
+def disruption_update(disruption_id):
+    """Update disruption status."""
+    disruption = db.session.get(Disruption, disruption_id)
+    if not disruption:
+        flash("Disruption not found.", "error")
+        return redirect(url_for("tracking.disruptions"))
+
+    new_status = request.form.get("status", "").strip()
+    valid_statuses = ["active", "adapting", "recovering", "resolved"]
+    if new_status not in valid_statuses:
+        flash("Invalid status.", "error")
+        return redirect(url_for("tracking.disruptions"))
+
+    disruption.status = new_status
+    if new_status == "resolved":
+        disruption.actual_end = date.today()
+
+    # Allow updating notes and severity
+    notes = request.form.get("notes", "").strip()
+    if notes:
+        disruption.notes = notes
+
+    severity_str = request.form.get("severity", "")
+    if severity_str:
+        try:
+            disruption.severity = max(1, min(5, int(severity_str)))
+        except ValueError:
+            pass
+
+    db.session.commit()
+    flash(f"Updated: {disruption.title} → {new_status}.", "info")
+    return redirect(url_for("tracking.disruptions"))

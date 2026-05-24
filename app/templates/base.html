@@ -7,6 +7,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>{% block title %}Grow{% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+{% if config.VAPID_PUBLIC_KEY %}
+<meta name="vapid-key" content="{{ config.VAPID_PUBLIC_KEY }}">
+{% endif %}
 {% block head %}{% endblock %}
 </head>
 <body>
@@ -46,5 +50,8 @@
       <span class="nav-label">Settings</span>
     </a>
   </nav>
+  {% if config.VAPID_PUBLIC_KEY %}
+  <script src="{{ url_for('static', filename='js/push.js') }}"></script>
+  {% endif %}
 </body>
 </html>

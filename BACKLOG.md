@@ -18,6 +18,13 @@ Last updated: 2026-05-24
 - [x] **Raspberry Pi 5 deployment** — OS installed, app deployed, systemd service running, SSH key auth configured
 - [x] **GitHub repo** — https://github.com/mickhinds/grow (public)
 - [x] **Concept document v2** — Full redesign around three phases, curious tone, micro-habits, plate model, local AI (see CONCEPT.md)
+- [x] **Contextual greeting** — Time-of-day + data-informed greeting (sleep quality, readiness, calendar density). No more hardcoded "Good morning".
+- [x] **Reset / Start Over system** — Three levels in Settings: Recalibrate (day counter only), Start Over (zero seeds/garden, keep data), Total Reset (wipe everything). Day counter now based on user.start_date.
+- [x] **Disruption tracking** — Structured disruption logging: injury (body part, can-still-do, avoid), work stress, illness, travel, mental health. Status lifecycle: active → adapting → recovering → resolved. Dashboard banner for active disruptions.
+- [x] **Dashboard redesign** — Garden-hero morning view, status sentence, weekly focus system, progressive disclosure ("More details"), anomaly-only metric cards. See CONCEPT.md section 9.
+- [x] **Status sentence engine** — Rule-based one-liner from yesterday's data, today's context, active disruptions, and weekly focus. AI-composable slot for Ministral 3B.
+- [x] **Weekly focus system** — User picks weekly priority from data-informed suggestions. Focus shapes status sentence and dashboard emphasis.
+- [x] **Anomaly detection** — Metrics surface on dashboard only when they deviate from personal 14-day rolling average. Covers sleep, steps, RHR, readiness, HRV.
 
 ---
 
@@ -54,21 +61,23 @@ Last updated: 2026-05-24
 - [x] **Raspberry Pi 5 setup** — Deployed on hallonpaj1 (192.168.50.16:8080), systemd service, SSH key auth
 - [x] **GitHub repo** — https://github.com/mickhinds/grow (public, .gitignore protects secrets)
 - [x] **Install flask-wtf on Pi** — Done as part of Pi deployment
-- [ ] **Tailscale** — Install on Pi + phone + Mac for secure access from anywhere, real HTTPS certificates, no port forwarding
-- [ ] **Caddy reverse proxy** — Run on Pi in front of Flask, handles HTTPS via Tailscale certs
-- [ ] **Google Calendar redirect URI** — Update to Tailscale hostname once Tailscale is running
+- [x] **Tailscale** — Installed on Pi + Pixel + Mac. Secure access from anywhere via hallonpaj1.tail745dc7.ts.net
+- [x] **Caddy reverse proxy** — Running on Pi in front of Flask, HTTPS via Tailscale certs
+- [ ] **Google Calendar redirect URI** — Update to Tailscale hostname (hallonpaj1.tail745dc7.ts.net)
 - [ ] **Backfill Oura history** — Run `python3 scripts/sync_oura.py --backfill` to pull historical data
 - [ ] **Oura API agreement** — Review compliance requirements for personal use
 - [ ] **Install Ollama on Pi** — Local AI runtime for Ministral 3B (see CONCEPT.md section 9)
+- [x] **Web Push notifications** — Service worker + VAPID keys + push subscription + cron scripts. 9 AM morning nudge if no dashboard activity, inactivity nudge after 2+ days. Requires `pip install pywebpush cryptography` on Pi + VAPID keys in .env.
 - [ ] **Cron job for daily sync** — 7 AM daily Oura sync via `scripts/sync_oura.py`
+- [ ] **Cron job for push notifications** — 9 AM morning nudge, 8 PM inactivity check via `scripts/send_push.py`
 
 ---
 
 ## UI / Design
 
-- [ ] **Updated visuals** — The garden scene and cards are functional but basic. Richer illustrations, smoother animations, maybe a day/night cycle in the garden that matches real time
-- [ ] **More coherent layout** — Currently many cards scattered on the dashboard. Group related items, reduce visual noise, consider a tabbed or swipeable card approach for mobile
-- [ ] **Compact design** — Less scrolling needed on the morning view. Priority info above the fold, details available on tap/expand
+- [x] **More coherent layout** — Dashboard redesigned: garden-hero + status sentence + focus + micro-habits + quick log above the fold. Details behind progressive disclosure.
+- [x] **Compact design** — Morning view shows 5 elements max. Metrics only surface as anomaly cards when notable.
+- [ ] **Updated visuals** — The garden scene is functional but basic. Richer illustrations, smoother animations, maybe a day/night cycle that matches real time or phase (spring/summer/autumn)
 - [ ] **Polish the Scandinavian theme** — Refine typography, spacing, and color balance. Consider subtle texture or grain for warmth
 
 ---
@@ -94,7 +103,7 @@ Last updated: 2026-05-24
 - [ ] **Reflection storage** — Store answers, feed them back to AI for longitudinal patterns.
 
 ### Disruption Tracking
-- [ ] **Disruption logging** — Structured entry: injury (body part, severity, can-still-do, timeline), work stress (duration, impact areas), illness, travel. Creates timeline with reassessment points.
+- [x] **Disruption logging** — Structured entry: injury (body part, severity, can-still-do, timeline), work stress (duration, impact areas), illness, travel. Creates timeline with reassessment points.
 - [ ] **Adapted programs** — Auto-adjust targets based on disruption type. Reduced step goals, alternative exercises, micro-habits only mode.
 - [ ] **Recovery arc** — Lifecycle: acute → adaptation → reintegration → resolved. Gradual return to Phase 1/2.
 

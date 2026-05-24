@@ -10,7 +10,7 @@ from typing import Optional
 
 from app.models import (
     db, User, OuraDaily, IFSession, FoodLog, Workout,
-    GardenState, GardenHistory, MicroHabitCompletion,
+    GardenState, GardenHistory, MicroHabitCompletion, Disruption,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,8 +35,43 @@ LEVEL_THRESHOLDS = [
 ]
 
 
+def _get_active_disruption_flags(user_id: int, day: date) -> dict:
+    """Check for active/adapting disruptions and their impact flags."""
+    disruptions = Disruption.query.filter(
+        Disruption.user_id == user_id,
+        Disruption.status.in_(["active", "adapting"]),
+        Disruption.start_date <= day,
+    ).all()
+
+    flags = {
+        "affects_movement": False,
+        "affects_training": False,
+        "affects_sleep": False,
+        "affects_nutrition": False,
+        "max_severity": 0,
+    }
+
+    for d in disruptions:
+        if d.affects_movement:
+            flags["affects_movement"] = True
+        if d.affects_training:
+            flags["affects_training"] = True
+        if d.affects_sleep:
+            flags["affects_sleep"] = True
+        if d.affects_nutrition:
+            flags["affects_nutrition"] = True
+        if d.severity and d.severity > flags["max_severity"]:
+            flags["max_severity"] = d.severity
+
+    return flags
+
+
 def calculate_seeds_for_day(user: User, day: date) -> dict:
-    """Calculate seeds earned for a given day. Returns breakdown dict."""
+    """Calculate seeds earned for a given day. Returns breakdown dict.
+
+    Respects active disruptions: when movement or training is affected,
+    thresholds are reduced so the user isn't penalized for what they can't do.
+    """
     seeds = {
         "seeds_steps": 0,
         "seeds_if": 0,
@@ -47,10 +82,18 @@ def calculate_seeds_for_day(user: User, day: date) -> dict:
         "seeds_bonus": 0,
     }
 
+    # Check for active disruptions
+    disruption_flags = _get_active_disruption_flags(user.id, day)
+
     # --- Steps ---
     oura = OuraDaily.query.filter_by(user_id=user.id, date=day).first()
     if oura and oura.steps:
-        if oura.steps >= user.step_target:
+        # During movement disruption: halve the step target so partial effort still earns seeds
+        effective_target = user.step_target
+        if disruption_flags["affects_movement"]:
+            effective_target = max(2000, user.step_target // 2)
+
+        if oura.steps >= effective_target:
             seeds["seeds_steps"] = SEEDS_STEP_TARGET
             if oura.steps >= 10000:
                 seeds["seeds_steps"] += SEEDS_STEP_BONUS
@@ -83,9 +126,15 @@ def calculate_seeds_for_day(user: User, day: date) -> dict:
                 seeds["seeds_training"] += 1
                 break  # Only one bonus per day
 
-    # Fallback: if no synced workouts yet, check if schedule says training day
-    # (covers the case before Oura syncs the workout)
-    if not workouts:
+    # During training disruption: don't penalize for missing sessions,
+    # and award partial credit for any movement logged as workout
+    if disruption_flags["affects_training"] and not workouts:
+        # Give awareness credit — they showed up even though they can't train
+        # (only if they did some steps, showing they're still active)
+        if oura and oura.steps and oura.steps >= 3000:
+            seeds["seeds_training"] = max(seeds["seeds_training"], 2)
+    elif not workouts:
+        # Normal fallback: check if schedule says training day
         from flask import current_app
         training_schedule = current_app.config.get("TRAINING_SCHEDULE", [])
         is_training_day = any(t["day"] == day.weekday() for t in training_schedule)
@@ -204,8 +253,13 @@ def _calculate_level(total_seeds: int) -> int:
 
 
 def _update_element_growth(garden: GardenState, user_id: int):
-    """Update garden element growth based on last 30 days of seeds."""
-    thirty_days_ago = date.today() - timedelta(days=30)
+    """Update garden element growth based on last 30 days of seeds.
+
+    Adjusts max expectations when disruptions affect movement or training,
+    so garden growth percentages don't drop unfairly during recovery.
+    """
+    today = date.today()
+    thirty_days_ago = today - timedelta(days=30)
 
     recent = GardenHistory.query.filter(
         GardenHistory.user_id == user_id,
@@ -215,12 +269,19 @@ def _update_element_growth(garden: GardenState, user_id: int):
     if not recent:
         return
 
+    # Count disrupted days in the last 30 to reduce max expectations
+    disrupted_movement_days = _count_disrupted_days(user_id, thirty_days_ago, today, "affects_movement")
+    disrupted_training_days = _count_disrupted_days(user_id, thirty_days_ago, today, "affects_training")
+
     days = len(recent)
+    effective_movement_days = max(1, days - disrupted_movement_days)
+    effective_training_days = max(1, days - disrupted_training_days)
+
     max_per_element = {
-        "meadow": days * (SEEDS_STEP_TARGET + SEEDS_STEP_BONUS),
+        "meadow": effective_movement_days * (SEEDS_STEP_TARGET + SEEDS_STEP_BONUS),
         "oak": days * SEEDS_IF_ADHERENCE,
         "pond": days * (SEEDS_SLEEP_GOOD + SEEDS_SLEEP_GREAT),
-        "stones": (days // 7) * 2 * SEEDS_TRAINING,  # ~2 training days per week
+        "stones": (effective_training_days // 7) * 2 * SEEDS_TRAINING,  # ~2 training days per week
         "path": days * (SEEDS_LOGGED_SWEET + SEEDS_CHOSE_NOT_TO),
     }
 
@@ -243,6 +304,26 @@ def _safe_pct(actual: int, maximum: int) -> int:
     if maximum <= 0:
         return 0
     return round((actual / maximum) * 100)
+
+
+def _count_disrupted_days(user_id: int, start: date, end: date, flag_name: str) -> int:
+    """Count days in range where a disruption with the given flag was active."""
+    disruptions = Disruption.query.filter(
+        Disruption.user_id == user_id,
+        Disruption.start_date <= end,
+        getattr(Disruption, flag_name) == True,
+        Disruption.status.in_(["active", "adapting", "recovering"]),
+    ).all()
+
+    disrupted_days = set()
+    for d in disruptions:
+        d_end = d.actual_end or d.estimated_end or end
+        day = max(start, d.start_date)
+        while day <= min(end, d_end):
+            disrupted_days.add(day)
+            day += timedelta(days=1)
+
+    return len(disrupted_days)
 
 
 def _update_streaks(garden: GardenState, user: User):

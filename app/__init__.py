@@ -41,9 +41,11 @@ def create_app(config_class=Config):
     from app.routes.dashboard import bp as dashboard_bp
     from app.routes.auth import bp as auth_bp
     from app.routes.tracking import bp as tracking_bp
+    from app.routes.push import bp as push_bp
 
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(tracking_bp)
+    app.register_blueprint(push_bp)
 
     return app

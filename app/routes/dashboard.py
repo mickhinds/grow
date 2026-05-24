@@ -3,16 +3,18 @@
 import logging
 from datetime import date, datetime, timedelta
 
-from flask import Blueprint, render_template, current_app, redirect, url_for, flash
+from flask import Blueprint, render_template, current_app, redirect, url_for, flash, request
 
 from app.models import (
     db, User, OuraDaily, GardenState, GardenHistory,
     IFSession, WeightTracking, Notification, Workout, FoodLog,
-    CalendarEvent,
+    CalendarEvent, Disruption,
 )
 from app.services.garden_engine import get_level_progress
 from app.services.google_calendar import analyze_day
 from app.services.micro_habits import get_todays_micro_habits
+from app.services.status_sentence import compose_status_sentence, get_focus_suggestions
+from app.services.anomaly import detect_anomalies
 
 logger = logging.getLogger(__name__)
 
@@ -161,8 +163,11 @@ def index():
         Notification.dismissed == False,
     ).order_by(Notification.created_at.desc()).first()
 
-    # Days since start (for "Day N" display)
-    days_active = GardenHistory.query.filter_by(user_id=1).count()
+    # Days since start — counted from user.start_date (set on reset/first use)
+    if user.start_date:
+        days_active = (today - user.start_date).days + 1  # Day 1 on start date
+    else:
+        days_active = 0
 
     # Has Oura been connected? (PAT or OAuth)
     oura_connected = bool(user.oura_pat or user.oura_access_token)
@@ -197,6 +202,31 @@ def index():
     # Micro-habits for today
     micro_habits = get_todays_micro_habits(user.id, today)
 
+    # Greeting — time-based + contextual
+    greeting = _get_greeting(user, oura, day_analysis)
+
+    # Status sentence — the voice of the app
+    status_sentence = compose_status_sentence(user, today)
+
+    # Weekly focus
+    focus_suggestions = []
+    needs_focus = False
+    if not user.weekly_focus or (user.weekly_focus_set_date and
+            (today - user.weekly_focus_set_date).days >= 7):
+        needs_focus = True
+        focus_suggestions = get_focus_suggestions(user, today)
+
+    # Anomaly cards — only show when something is notably different
+    anomalies = detect_anomalies(user.id, today)
+
+    # Active disruptions
+    active_disruptions = Disruption.query.filter_by(
+        user_id=1, status="active"
+    ).order_by(Disruption.created_at.desc()).all()
+    adapting_disruptions = Disruption.query.filter_by(
+        user_id=1, status="adapting"
+    ).order_by(Disruption.created_at.desc()).all()
+
     # Movement nudge logic (now calendar-aware)
     movement_nudge = _get_movement_nudge(user, today, workouts_this_week, day_analysis)
 
@@ -210,7 +240,6 @@ def index():
         "dashboard.html",
         user=user,
         today=today,
-        yesterday=yesterday,
         oura=oura,
         oura_today=oura_today,
         garden=garden,
@@ -221,8 +250,6 @@ def index():
         if_total=if_total,
         latest_weight=latest_weight,
         prev_weight=prev_weight,
-        training=training,
-        notification=notification,
         days_active=days_active,
         oura_connected=oura_connected,
         workouts_this_week=workouts_this_week,
@@ -231,8 +258,14 @@ def index():
         micro_habits=micro_habits,
         google_connected=google_connected,
         today_events=today_events,
-        day_analysis=day_analysis,
         last_synced=last_synced,
+        greeting=greeting,
+        status_sentence=status_sentence,
+        needs_focus=needs_focus,
+        focus_suggestions=focus_suggestions,
+        anomalies=anomalies,
+        active_disruptions=active_disruptions,
+        adapting_disruptions=adapting_disruptions,
     )
 
 
@@ -277,6 +310,34 @@ def manual_sync():
         flash("Sync failed. Check the logs.", "error")
         logger.exception(f"Manual sync error: {e}")
 
+    return redirect(url_for("dashboard.index"))
+
+
+@bp.route("/focus", methods=["POST"])
+def set_focus():
+    """Set the weekly focus — what matters most this week."""
+    user = db.session.get(User, 1)
+    focus_key = request.form.get("focus", "").strip()
+    valid_keys = ["steps", "if", "sleep", "training", "awareness", "nutrition"]
+    if focus_key not in valid_keys:
+        flash("Pick a focus area.", "error")
+        return redirect(url_for("dashboard.index"))
+
+    labels = {
+        "steps": "Steps consistency",
+        "if": "Fasting window",
+        "sleep": "Sleep quality",
+        "training": "Training consistency",
+        "awareness": "Daily logging",
+        "nutrition": "Balanced meals",
+    }
+
+    user.weekly_focus = focus_key
+    user.weekly_focus_label = labels.get(focus_key, focus_key)
+    user.weekly_focus_set_date = date.today()
+    db.session.commit()
+
+    flash(f"This week: {labels.get(focus_key)}.", "success")
     return redirect(url_for("dashboard.index"))
 
 
@@ -397,6 +458,58 @@ def _get_movement_nudge(user: User, today: date, workouts_this_week: list,
         }
 
     return None
+
+
+def _get_greeting(user: User, oura_yesterday, day_analysis, visit_count: int = 1) -> str:
+    """Build a time-based + contextual greeting.
+
+    Not coaching, not cheerleading. Curious.
+    """
+    now = datetime.now()
+    hour = now.hour
+    name = user.name or ""
+
+    # Time-based base
+    if hour < 5:
+        base = f"Can't sleep, {name}?"
+    elif hour < 7:
+        base = f"Early start, {name}"
+    elif hour < 10:
+        base = f"Good morning, {name}"
+    elif hour < 12:
+        base = f"Morning, {name}"
+    elif hour < 17:
+        base = f"Afternoon, {name}"
+    elif hour < 21:
+        base = f"Evening, {name}"
+    else:
+        base = f"Still up, {name}?"
+
+    # Contextual overrides — only one, the most relevant
+    if visit_count > 1:
+        # Not the first dashboard load today
+        if hour < 12:
+            return f"Back again, {name}"
+        elif hour >= 21:
+            return f"One more look, {name}?"
+        else:
+            return f"Checking in, {name}"
+
+    if oura_yesterday:
+        # Rough night
+        if oura_yesterday.sleep_score and oura_yesterday.sleep_score < 55 and hour < 10:
+            return f"Rough night? Take it easy, {name}"
+        # Great readiness
+        if oura_yesterday.readiness_score and oura_yesterday.readiness_score >= 85 and hour < 12:
+            return f"Looking sharp today, {name}"
+
+    if day_analysis:
+        if day_analysis.get("is_busy_day") and hour < 12:
+            return f"Full day ahead, {name}"
+        elif day_analysis.get("is_light_day") and hour < 12:
+            return f"Open day today, {name}"
+
+    return base
 
 
 def _get_upcoming_training(today: date) -> list:

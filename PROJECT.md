@@ -50,13 +50,16 @@ grow/
 │   ├── routes/
 │   │   ├── dashboard.py     # Main dashboard, auto-sync, manual sync, nudges
 │   │   ├── auth.py          # OAuth flows (Oura + Google), settings, disconnect
-│   │   └── tracking.py      # Weight, IF, food/sweet, exercise, micro-habit logging
+│   │   ├── tracking.py      # Weight, IF, food/sweet, exercise, micro-habit logging
+│   │   └── push.py          # Web Push subscribe/unsubscribe API
 │   │
 │   ├── services/
 │   │   ├── oura_client.py   # Oura API v2 wrapper (PAT + OAuth, all endpoints)
 │   │   ├── google_calendar.py # Google Calendar client + analyze_day()
 │   │   ├── garden_engine.py # Seed calculation, level progression, streaks
 │   │   ├── micro_habits.py  # Micro-habit selection engine, pool seeding
+│   │   ├── status_sentence.py # One-line status: yesterday + today + focus
+│   │   ├── anomaly.py       # Personal baseline anomaly detection
 │   │   └── data_sync.py     # Daily sync job (for cron), backfill utility
 │   │
 │   ├── templates/
@@ -68,13 +71,18 @@ grow/
 │   │   ├── food_log.html    # Sweet/snack logging with expandable reason fields
 │   │   ├── weight.html      # Weight + waist tracking
 │   │   ├── google_calendars.html  # Calendar selection checkboxes
+│   │   ├── disruptions.html      # Disruption logging and management
 │   │   └── auth_status.html # Debug: connection status
 │   │
-│   └── static/css/
-│       └── style.css        # Scandinavian minimalist theme
+│   └── static/
+│       ├── css/style.css    # Scandinavian minimalist theme
+│       ├── js/push.js       # Web Push subscription manager
+│       └── sw.js            # Service worker for push notifications
 │
 ├── scripts/
 │   ├── sync_oura.py         # CLI sync script (for cron on Pi)
+│   ├── send_push.py         # Push notification sender (for cron: morning + inactivity)
+│   ├── generate_vapid_keys.py  # One-time VAPID key generator
 │   └── init_db.py           # DB initialization helper
 │
 ├── data/                    # SQLite database lives here (gitignored)
@@ -95,6 +103,8 @@ All tables have `user_id` foreign key for future multi-user support.
 - **GardenHistory** — daily seed breakdown (audit trail of every good choice)
 - **MicroHabit** — pool of available micro-habits: category, text, context flags for rule-based selection
 - **MicroHabitCompletion** — daily suggestions and completions per user, tracks completion and dismissal
+- **Disruption** — life disruptions (injury, stress, illness, travel). Type, severity 1-5, body part, can-still-do/avoid, impact flags, status lifecycle (active → adapting → recovering → resolved)
+- **PushSubscription** — Web Push subscription per browser/device: endpoint, p256dh, auth keys
 - **CalendarEvent** — cached today's calendar events for nudge analysis
 - **Notification** — nudges and insights
 
@@ -150,11 +160,16 @@ Working and deployed on Pi:
 - Google Calendar integration with context-aware nudges
 - Weight tracking with trend display
 - Micro-habit engine: rule-based daily suggestions (1–3), context-aware selection, one-tap completion, 1 seed each
-- Settings page with Oura PAT, Google Calendar, profile, targets
+- Contextual greeting: time-of-day + Oura/calendar data-informed
+- Reset system: three levels (recalibrate, start over, total reset) in Settings
+- Disruption tracking: structured logging, status lifecycle, dashboard banner
+- Settings page with Oura PAT, Google Calendar, profile, targets, reset options
+- Web Push notifications: service worker, VAPID keys, push subscription, cron-ready scripts
 - Running on Raspberry Pi 5 (hallonpaj1) via systemd
 - GitHub repo: https://github.com/mickhinds/grow
 
 Not yet done (see BACKLOG.md and CONCEPT.md):
+- Cron jobs for push notifications and daily Oura sync
 - Tailscale + Caddy (secure remote access)
 - Three-phase system (Build Routine → Harvest → Adapt)
 - Phase-aware micro-habits + disruption-adapted filtering

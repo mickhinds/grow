@@ -11,7 +11,11 @@ from flask import (
 )
 from markupsafe import escape
 
-from app.models import db, User
+from app.models import (
+    db, User, OuraDaily, GardenState, GardenHistory,
+    IFSession, WeightTracking, FoodLog, Workout,
+    MicroHabitCompletion, CalendarEvent, Notification, Disruption,
+)
 
 bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -344,6 +348,107 @@ def settings_save():
 
     db.session.commit()
     flash("Settings saved.", "success")
+    return redirect(url_for("auth.settings"))
+
+
+# --- Reset / Start Over ---
+
+@bp.route("/reset/total", methods=["POST"])
+def reset_total():
+    """Total data reset — wipe everything except user profile and connections."""
+    from datetime import date as date_type
+
+    user = db.session.get(User, 1)
+
+    # Delete all tracking data
+    OuraDaily.query.filter_by(user_id=1).delete()
+    GardenHistory.query.filter_by(user_id=1).delete()
+    IFSession.query.filter_by(user_id=1).delete()
+    WeightTracking.query.filter_by(user_id=1).delete()
+    FoodLog.query.filter_by(user_id=1).delete()
+    Workout.query.filter_by(user_id=1).delete()
+    MicroHabitCompletion.query.filter_by(user_id=1).delete()
+    CalendarEvent.query.filter_by(user_id=1).delete()
+    Notification.query.filter_by(user_id=1).delete()
+    Disruption.query.filter_by(user_id=1).delete()
+
+    # Reset garden state
+    garden = GardenState.query.filter_by(user_id=1).first()
+    if garden:
+        garden.total_seeds = 0
+        garden.level = 1
+        garden.meadow_growth = 0
+        garden.oak_growth = 0
+        garden.pond_growth = 0
+        garden.stones_growth = 0
+        garden.path_growth = 0
+        garden.if_streak_days = 0
+        garden.step_streak_days = 0
+        garden.sleep_streak_days = 0
+
+    # Reset start date to today
+    user.start_date = date_type.today()
+
+    db.session.commit()
+    flash("Total reset complete. Fresh start — Day 1.", "success")
+    return redirect(url_for("dashboard.index"))
+
+
+@bp.route("/reset/start-over", methods=["POST"])
+def reset_start_over():
+    """Start over — zero seeds, garden, and day count. Keep Oura data and weight history."""
+    from datetime import date as date_type
+
+    user = db.session.get(User, 1)
+
+    # Delete garden history and completions (progress tracking)
+    GardenHistory.query.filter_by(user_id=1).delete()
+    MicroHabitCompletion.query.filter_by(user_id=1).delete()
+    IFSession.query.filter_by(user_id=1).delete()
+    FoodLog.query.filter_by(user_id=1).delete()
+    Notification.query.filter_by(user_id=1).delete()
+
+    # Resolve any active disruptions
+    active = Disruption.query.filter(
+        Disruption.user_id == 1,
+        Disruption.status.in_(["active", "adapting", "recovering"]),
+    ).all()
+    for d in active:
+        d.status = "resolved"
+        d.actual_end = date_type.today()
+
+    # Reset garden state
+    garden = GardenState.query.filter_by(user_id=1).first()
+    if garden:
+        garden.total_seeds = 0
+        garden.level = 1
+        garden.meadow_growth = 0
+        garden.oak_growth = 0
+        garden.pond_growth = 0
+        garden.stones_growth = 0
+        garden.path_growth = 0
+        garden.if_streak_days = 0
+        garden.step_streak_days = 0
+        garden.sleep_streak_days = 0
+
+    # New start date
+    user.start_date = date_type.today()
+
+    db.session.commit()
+    flash("Starting over. Seeds zeroed, goals ready to redefine. Day 1.", "success")
+    return redirect(url_for("auth.settings"))
+
+
+@bp.route("/reset/recalibrate", methods=["POST"])
+def reset_recalibrate():
+    """Recalibrate — keep everything, just reset the day counter and allow goal updates."""
+    from datetime import date as date_type
+
+    user = db.session.get(User, 1)
+    user.start_date = date_type.today()
+
+    db.session.commit()
+    flash("Recalibrated. Day counter reset to Day 1. Update your goals below.", "success")
     return redirect(url_for("auth.settings"))
 
 

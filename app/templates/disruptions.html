@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Disruptions — Grow{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('dashboard.index') }}" class="back-link">&larr; Dashboard</a>
+<div class="page-title">Life happens</div>
+<div class="text-sm text-muted" style="margin-bottom:16px;">
+  Injuries, stress, illness, travel — disruptions are part of the journey.
+  Logging them helps your garden adapt instead of just falling behind.
+</div>
+
+<!-- Active disruptions -->
+{% if active %}
+<div class="card-label" style="margin-bottom:8px;">Active</div>
+{% for d in active %}
+<div class="card disruption-detail-card" style="border-left: 3px solid {% if d.status == 'active' %}var(--amber){% elif d.status == 'adapting' %}var(--blue){% else %}var(--green){% endif %};">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <span class="disruption-type-badge disruption-{{ d.disruption_type }}">{{ d.disruption_type|replace('_', ' ') }}</span>
+      <strong>{{ d.title }}</strong>
+    </div>
+    <span class="text-sm text-muted">{{ d.severity }}/5</span>
+  </div>
+
+  {% if d.body_part %}
+  <div class="text-sm text-muted mt-8">Body part: {{ d.body_part }}</div>
+  {% endif %}
+  {% if d.can_still_do %}
+  <div class="text-sm mt-8" style="color:var(--green);">Can still do: {{ d.can_still_do }}</div>
+  {% endif %}
+  {% if d.avoid %}
+  <div class="text-sm mt-8" style="color:var(--amber);">Avoid: {{ d.avoid }}</div>
+  {% endif %}
+  {% if d.notes %}
+  <div class="text-sm text-muted mt-8">{{ d.notes }}</div>
+  {% endif %}
+
+  <div class="text-sm text-muted mt-8">
+    Since {{ d.start_date.strftime('%-d %b %Y') }}
+    ({{ (today - d.start_date).days }} days)
+    {% if d.estimated_end %} · Target: {{ d.estimated_end.strftime('%-d %b') }}{% endif %}
+  </div>
+
+  <!-- Status transitions -->
+  <div class="btn-row mt-8">
+    {% if d.status == 'active' %}
+    <form method="POST" action="{{ url_for('tracking.disruption_update', disruption_id=d.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="adapting">
+      <button type="submit" class="btn btn-sm btn-outline">Adapting</button>
+    </form>
+    <form method="POST" action="{{ url_for('tracking.disruption_update', disruption_id=d.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="resolved">
+      <button type="submit" class="btn btn-sm btn-ghost">Resolved</button>
+    </form>
+    {% elif d.status == 'adapting' %}
+    <form method="POST" action="{{ url_for('tracking.disruption_update', disruption_id=d.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="recovering">
+      <button type="submit" class="btn btn-sm btn-outline">Recovering</button>
+    </form>
+    <form method="POST" action="{{ url_for('tracking.disruption_update', disruption_id=d.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="resolved">
+      <button type="submit" class="btn btn-sm btn-ghost">Resolved</button>
+    </form>
+    {% elif d.status == 'recovering' %}
+    <form method="POST" action="{{ url_for('tracking.disruption_update', disruption_id=d.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="status" value="resolved">
+      <button type="submit" class="btn btn-sm btn-outline" style="color:var(--green);">Resolved</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- Add new disruption -->
+<div class="card">
+  <div class="card-label">Log a disruption</div>
+
+  <form method="POST" action="{{ url_for('tracking.disruption_add') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="form-group">
+      <label class="form-label" for="disruption_type">Type</label>
+      <select name="disruption_type" id="disruption_type" class="form-input" onchange="toggleInjuryFields(this.value)">
+        {% for value, label in disruption_types %}
+        <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="title">What's going on?</label>
+      <input type="text" name="title" id="title" class="form-input"
+             placeholder="e.g. Right knee pain, deadline stress" maxlength="200" required>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="severity">Severity</label>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="range" name="severity" id="severity" min="1" max="5" value="3"
+               style="flex:1;" oninput="document.getElementById('sev-display').textContent = this.value + '/5'">
+        <span id="sev-display" class="text-sm" style="min-width:30px;">3/5</span>
+      </div>
+      <div class="form-hint">1 = minor nuisance, 5 = can't do much</div>
+    </div>
+
+    <!-- Injury-specific fields -->
+    <div id="injury-fields" style="display:none;">
+      <div class="form-group">
+        <label class="form-label" for="body_part">Body part</label>
+        <input type="text" name="body_part" id="body_part" class="form-input"
+               placeholder="e.g. right knee, lower back" maxlength="100">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="can_still_do">What can you still do?</label>
+        <input type="text" name="can_still_do" id="can_still_do" class="form-input"
+               placeholder="e.g. walking, upper body, stretching" maxlength="500">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="avoid">What to avoid</label>
+        <input type="text" name="avoid" id="avoid" class="form-input"
+               placeholder="e.g. running, squats, heavy lifting" maxlength="500">
+      </div>
+    </div>
+
+    <!-- What does this affect? -->
+    <div class="form-group">
+      <label class="form-label">What does this affect?</label>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;">
+        <label class="check-label"><input type="checkbox" name="affects_movement"> Movement</label>
+        <label class="check-label"><input type="checkbox" name="affects_training"> Training</label>
+        <label class="check-label"><input type="checkbox" name="affects_sleep"> Sleep</label>
+        <label class="check-label"><input type="checkbox" name="affects_nutrition"> Nutrition</label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="estimated_end">Expected to resolve by</label>
+      <input type="date" name="estimated_end" id="estimated_end" class="form-input">
+      <div class="form-hint">Optional — just a guess, no pressure</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="notes">Notes</label>
+      <textarea name="notes" id="notes" class="form-input" rows="2"
+                placeholder="Any context that might help later" maxlength="1000"></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">Log disruption</button>
+  </form>
+</div>
+
+<!-- Past disruptions -->
+{% if resolved %}
+<details style="margin-top:16px;">
+  <summary class="card-label" style="cursor:pointer; color:var(--muted);">Past disruptions ({{ resolved|length }})</summary>
+  {% for d in resolved %}
+  <div class="card" style="opacity:0.7; margin-top:8px;">
+    <div style="display:flex; justify-content:space-between;">
+      <div>
+        <span class="disruption-type-badge disruption-{{ d.disruption_type }}">{{ d.disruption_type|replace('_', ' ') }}</span>
+        {{ d.title }}
+      </div>
+      <span class="text-sm text-muted">
+        {{ d.start_date.strftime('%-d %b') }}{% if d.actual_end %} — {{ d.actual_end.strftime('%-d %b') }}{% endif %}
+      </span>
+    </div>
+  </div>
+  {% endfor %}
+</details>
+{% endif %}
+
+<script>
+function toggleInjuryFields(type) {
+  document.getElementById('injury-fields').style.display = type === 'injury' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

@@ -53,6 +53,14 @@ class User(db.Model):
     google_token_expires_at = db.Column(db.Float)
     google_calendar_ids = db.Column(db.Text)  # Comma-separated calendar IDs to watch
 
+    # Journey tracking
+    start_date = db.Column(db.Date)  # When the current journey started (set on reset/first use)
+
+    # Weekly focus — what matters most this week
+    weekly_focus = db.Column(db.String(50))  # steps, if, sleep, training, awareness, nutrition
+    weekly_focus_label = db.Column(db.String(200))  # Human-readable: "Hit step target 5 of 7 days"
+    weekly_focus_set_date = db.Column(db.Date)  # When the focus was last set
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
@@ -275,6 +283,65 @@ class MicroHabitCompletion(db.Model):
     )
 
 
+class Disruption(db.Model):
+    """Life disruptions — injury, stress, illness, travel, etc.
+
+    Disruptions affect targets, micro-habit selection, and nudge tone.
+    Status lifecycle: active → adapting → recovering → resolved.
+    """
+
+    __tablename__ = "disruptions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+
+    # What kind of disruption
+    disruption_type = db.Column(db.String(50), nullable=False)
+    # Types: injury, work_stress, illness, travel, mental_health, life_event, other
+
+    title = db.Column(db.String(200), nullable=False)  # Short description
+    notes = db.Column(db.Text)  # Longer context, optional
+
+    # Severity 1-5 (1 = minor, 5 = severe)
+    severity = db.Column(db.Integer, default=3)
+
+    # For injuries specifically
+    body_part = db.Column(db.String(100))  # e.g. "right knee", "lower back"
+    can_still_do = db.Column(db.Text)  # What's still possible, e.g. "walking, upper body"
+    avoid = db.Column(db.Text)  # What to avoid, e.g. "running, squats"
+
+    # Impact on habits
+    affects_movement = db.Column(db.Boolean, default=False)
+    affects_training = db.Column(db.Boolean, default=False)
+    affects_sleep = db.Column(db.Boolean, default=False)
+    affects_nutrition = db.Column(db.Boolean, default=False)
+
+    # Timeline
+    start_date = db.Column(db.Date, nullable=False)
+    estimated_end = db.Column(db.Date)  # When you think it might resolve
+    actual_end = db.Column(db.Date)  # When it actually resolved
+
+    # Lifecycle: active → adapting → recovering → resolved
+    status = db.Column(db.String(20), default="active")
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PushSubscription(db.Model):
+    """Web Push subscription — one per browser/device."""
+
+    __tablename__ = "push_subscriptions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    endpoint = db.Column(db.Text, nullable=False, unique=True)
+    p256dh = db.Column(db.Text, nullable=False)  # Client public key
+    auth = db.Column(db.Text, nullable=False)  # Auth secret
+    user_agent = db.Column(db.String(300))  # For debugging which device
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class CalendarEvent(db.Model):
     """Cached calendar events for today/tomorrow — refreshed on each sync."""
 
@@ -321,6 +388,7 @@ def init_default_user(app):
                 if_end=app.config.get("DEFAULT_IF_END", "19:00"),
                 step_target=app.config.get("DEFAULT_STEP_TARGET", 8000),
                 sleep_target_mins=app.config.get("DEFAULT_SLEEP_TARGET_MINS", 420),
+                start_date=date.today(),
             )
             db.session.add(user)
 
