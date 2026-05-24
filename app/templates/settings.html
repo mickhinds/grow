@@ -202,6 +202,20 @@
   <button type="submit" class="btn btn-primary btn-block">Save settings</button>
 </form>
 
+<!-- Notifications -->
+{% if config.VAPID_PUBLIC_KEY %}
+<div class="card">
+  <div class="card-label">Notifications</div>
+  <div class="text-sm text-muted mb-8">
+    Get a gentle morning nudge if you haven't checked in, and a reminder if you've been away a few days.
+  </div>
+  <button type="button" id="enable-push-btn" class="btn btn-sm btn-primary" style="display:none;">
+    Enable notifications
+  </button>
+  <noscript><div class="text-sm text-muted">JavaScript required for push notifications.</div></noscript>
+</div>
+{% endif %}
+
 <!-- Reset / Start Over -->
 <div class="card" style="border-left: 3px solid var(--amber);">
   <div class="card-label">Reset</div>

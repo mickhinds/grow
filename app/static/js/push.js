@@ -27,35 +27,10 @@
     return outputArray;
   }
 
-  // Register service worker and subscribe
-  navigator.serviceWorker.register('/static/sw.js')
-    .then(function(registration) {
-      console.log('Service worker registered.');
-      return registration.pushManager.getSubscription()
-        .then(function(subscription) {
-          if (subscription) {
-            // Already subscribed — send to server in case it's a new device/reinstall
-            return sendSubscriptionToServer(subscription);
-          }
-          // Subscribe
-          return registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(applicationServerKey)
-          }).then(function(subscription) {
-            return sendSubscriptionToServer(subscription);
-          });
-        });
-    })
-    .catch(function(err) {
-      console.log('Push subscription failed:', err);
-    });
-
-
   function sendSubscriptionToServer(subscription) {
     var key = subscription.getKey('p256dh');
     var auth = subscription.getKey('auth');
 
-    // Get CSRF token from meta tag
     var csrfMeta = document.querySelector('meta[name="csrf-token"]');
     var csrfToken = csrfMeta ? csrfMeta.content : '';
 
@@ -73,7 +48,63 @@
     }).then(function(response) {
       if (response.ok) {
         console.log('Push subscription saved.');
+        // Update button state if it exists
+        var btn = document.getElementById('enable-push-btn');
+        if (btn) {
+          btn.textContent = 'Notifications enabled';
+          btn.disabled = true;
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-ghost');
+        }
       }
     });
   }
+
+  function subscribeUser(registration) {
+    return registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(applicationServerKey)
+    }).then(function(subscription) {
+      return sendSubscriptionToServer(subscription);
+    });
+  }
+
+  // Register service worker
+  navigator.serviceWorker.register('/static/sw.js')
+    .then(function(registration) {
+      console.log('Service worker registered.');
+
+      // Check current permission state
+      if (Notification.permission === 'granted') {
+        // Already granted — subscribe silently
+        registration.pushManager.getSubscription()
+          .then(function(subscription) {
+            if (subscription) {
+              sendSubscriptionToServer(subscription);
+            } else {
+              subscribeUser(registration);
+            }
+          });
+      } else if (Notification.permission === 'default') {
+        // Not yet decided — show the enable button if it exists
+        var btn = document.getElementById('enable-push-btn');
+        if (btn) {
+          btn.style.display = 'inline-block';
+          btn.addEventListener('click', function() {
+            Notification.requestPermission().then(function(permission) {
+              if (permission === 'granted') {
+                subscribeUser(registration);
+              } else {
+                btn.textContent = 'Notifications blocked';
+                btn.disabled = true;
+              }
+            });
+          });
+        }
+      }
+      // If 'denied', do nothing — user has explicitly blocked
+    })
+    .catch(function(err) {
+      console.log('Service worker registration failed:', err);
+    });
 })();
