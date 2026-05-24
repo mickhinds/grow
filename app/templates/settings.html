@@ -209,9 +209,13 @@
   <div class="text-sm text-muted mb-8">
     Get a gentle morning nudge if you haven't checked in, and a reminder if you've been away a few days.
   </div>
+  <div id="push-status" class="text-sm" style="color:var(--green); font-weight:600; display:none;">Notifications enabled</div>
   <button type="button" id="enable-push-btn" class="btn btn-sm btn-primary" style="display:none;">
     Enable notifications
   </button>
+  <div id="push-denied" class="text-sm" style="color:var(--amber); display:none;">
+    Notifications are blocked. Allow them in your browser settings for this site.
+  </div>
   <noscript><div class="text-sm text-muted">JavaScript required for push notifications.</div></noscript>
 </div>
 {% endif %}

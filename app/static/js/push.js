@@ -27,6 +27,25 @@
     return outputArray;
   }
 
+  function showStatus(state) {
+    var statusEl = document.getElementById('push-status');
+    var btnEl = document.getElementById('enable-push-btn');
+    var deniedEl = document.getElementById('push-denied');
+    if (!statusEl || !btnEl || !deniedEl) return;
+
+    statusEl.style.display = 'none';
+    btnEl.style.display = 'none';
+    deniedEl.style.display = 'none';
+
+    if (state === 'granted') {
+      statusEl.style.display = 'block';
+    } else if (state === 'denied') {
+      deniedEl.style.display = 'block';
+    } else {
+      btnEl.style.display = 'inline-block';
+    }
+  }
+
   function sendSubscriptionToServer(subscription) {
     var key = subscription.getKey('p256dh');
     var auth = subscription.getKey('auth');
@@ -48,14 +67,7 @@
     }).then(function(response) {
       if (response.ok) {
         console.log('Push subscription saved.');
-        // Update button state if it exists
-        var btn = document.getElementById('enable-push-btn');
-        if (btn) {
-          btn.textContent = 'Notifications enabled';
-          btn.disabled = true;
-          btn.classList.remove('btn-primary');
-          btn.classList.add('btn-ghost');
-        }
+        showStatus('granted');
       }
     });
   }
@@ -76,6 +88,7 @@
 
       // Check current permission state
       if (Notification.permission === 'granted') {
+        showStatus('granted');
         // Already granted — subscribe silently
         registration.pushManager.getSubscription()
           .then(function(subscription) {
@@ -85,24 +98,24 @@
               subscribeUser(registration);
             }
           });
-      } else if (Notification.permission === 'default') {
-        // Not yet decided — show the enable button if it exists
+      } else if (Notification.permission === 'denied') {
+        showStatus('denied');
+      } else {
+        // Permission is 'default' — show the enable button
+        showStatus('default');
         var btn = document.getElementById('enable-push-btn');
         if (btn) {
-          btn.style.display = 'inline-block';
           btn.addEventListener('click', function() {
             Notification.requestPermission().then(function(permission) {
               if (permission === 'granted') {
                 subscribeUser(registration);
               } else {
-                btn.textContent = 'Notifications blocked';
-                btn.disabled = true;
+                showStatus('denied');
               }
             });
           });
         }
       }
-      // If 'denied', do nothing — user has explicitly blocked
     })
     .catch(function(err) {
       console.log('Service worker registration failed:', err);
