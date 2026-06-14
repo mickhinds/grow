@@ -8,6 +8,7 @@ import time
 import logging
 from datetime import date, datetime, timedelta
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -122,13 +123,17 @@ class GoogleCalendarClient:
 
     def fetch_events(self, calendar_id: str, target_date: date) -> list:
         """Fetch events for a single calendar on a given date."""
-        # Use timezone-aware boundaries to avoid missing events at day boundaries
-        # Helsinki is UTC+2 (winter) or UTC+3 (summer), so pad by a few hours
+        # Google Calendar API requires RFC3339 with timezone offset
+        # e.g. "2026-06-14T00:00:00+03:00" — not bare "2026-06-14T00:00:00"
         user = self._get_user()
         tz = user.timezone or "Europe/Helsinki"
+        tz_obj = ZoneInfo(tz)
 
-        start = f"{target_date.isoformat()}T00:00:00"
-        end = f"{(target_date + timedelta(days=1)).isoformat()}T00:00:00"
+        start_dt = datetime(target_date.year, target_date.month, target_date.day,
+                            0, 0, 0, tzinfo=tz_obj)
+        end_dt = start_dt + timedelta(days=1)
+        start = start_dt.isoformat()
+        end = end_dt.isoformat()
 
         data = self._api_get(
             f"/calendars/{requests.utils.quote(calendar_id, safe='')}/events",
