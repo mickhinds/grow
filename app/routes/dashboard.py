@@ -427,11 +427,31 @@ def _get_if_status(user: User) -> dict:
 
 def _get_movement_nudge(user: User, today: date, workouts_this_week: list,
                         day_analysis: dict = None) -> dict:
-    """Generate a gentle, calendar-aware movement nudge."""
+    """Generate a contextual nudge combining calendar, movement, and body data.
+
+    Priority order:
+    1. Calendar + movement combined signals (the core insight engine)
+    2. Movement-only signals
+    3. Sweet-triggered gentle nudge
+
+    Tone: curious, empathetic, never nagging. Acknowledges difficulty.
+    """
     week_mins = sum(w.duration_mins or 0 for w in workouts_this_week)
     target_mins = user.weekly_activity_target_mins or 150
 
-    # Check if there was a sweet logged today
+    # Today's body data
+    oura_today = OuraDaily.query.filter_by(user_id=user.id, date=today).first()
+    steps_today = oura_today.steps if oura_today and oura_today.steps else 0
+    step_target = user.step_target or 8000
+    low_movement = steps_today < step_target * 0.5
+
+    # Yesterday's recovery data
+    yesterday = today - timedelta(days=1)
+    oura_yesterday = OuraDaily.query.filter_by(user_id=user.id, date=yesterday).first()
+    poor_sleep = (oura_yesterday and oura_yesterday.sleep_score
+                  and oura_yesterday.sleep_score < 65)
+
+    # Sweet trigger
     today_sweets = FoodLog.query.filter(
         FoodLog.user_id == user.id,
         FoodLog.date == today,
@@ -439,40 +459,62 @@ def _get_movement_nudge(user: User, today: date, workouts_this_week: list,
         FoodLog.chose_not_to == False,
     ).count()
 
-    # Check today's steps
-    oura_today = OuraDaily.query.filter_by(user_id=user.id, date=today).first()
-    steps_today = oura_today.steps if oura_today and oura_today.steps else 0
-    step_target = user.step_target or 8000
+    # --- Calendar + movement combined nudges ---
+    if day_analysis and day_analysis["total_meetings"] > 0:
+        is_busy = day_analysis["is_busy_day"]
+        is_light = day_analysis["is_light_day"]
+        gaps = day_analysis.get("free_gaps", [])
+        lunch_free = day_analysis.get("lunch_free", True)
 
-    # Calendar nudges disabled until calendar sync is reliable
-    # (user feedback: "looks like a light day" when day is fully packed)
-    if False and day_analysis:
-        if day_analysis["is_busy_day"] and day_analysis["free_gaps"]:
-            # Busy day with gaps — suggest using them
-            best_gap = max(day_analysis["free_gaps"], key=lambda g: g["duration_mins"])
+        # Packed day + low movement: empathy first
+        if is_busy and low_movement and not gaps:
+            if poor_sleep:
+                return {
+                    "type": "empathy",
+                    "message": "Short night and wall-to-wall meetings. Take it easy today.",
+                }
             return {
-                "type": "calendar",
-                "message": f"Packed day ahead. You have a {best_gap['duration_mins']}-min gap at {best_gap['start']} \u2014 perfect for a walk.",
-            }
-        elif day_analysis["is_busy_day"] and not day_analysis["free_gaps"]:
-            # Wall-to-wall meetings — empathy, not pressure
-            return {
-                "type": "calendar",
-                "message": "Heavy day \u2014 take it easy. Even a short stretch between calls counts.",
-            }
-        elif day_analysis["is_light_day"] and week_mins < target_mins:
-            return {
-                "type": "calendar",
-                "message": "Light calendar today. Good time for a training session?",
-            }
-        elif day_analysis["lunch_free"] and steps_today < step_target * 0.3:
-            return {
-                "type": "calendar",
-                "message": "Lunch looks free \u2014 a walk then would grow your meadow.",
+                "type": "empathy",
+                "message": f"Packed day with {day_analysis['total_meetings']} meetings. A stretch between calls is enough.",
             }
 
-    # Non-calendar nudges
-    if today_sweets > 0 and steps_today < step_target * 0.5:
+        # Packed day but gaps exist: suggest using them
+        if is_busy and gaps:
+            best_gap = max(gaps, key=lambda g: g["duration_mins"])
+            if low_movement:
+                return {
+                    "type": "opportunity",
+                    "message": f"Busy day, but you have {best_gap['duration_mins']} min free at {best_gap['start']}. A walk then would make a difference.",
+                }
+            return {
+                "type": "praise",
+                "message": "Full day but you found time to move. Nice.",
+            }
+
+        # Light day + low movement: gentle encouragement
+        if is_light and low_movement and week_mins < target_mins:
+            remaining = target_mins - week_mins
+            return {
+                "type": "opportunity",
+                "message": f"Light schedule today and {remaining} min left on your weekly target. Good day for it.",
+            }
+
+        # Light day + already active: praise
+        if is_light and not low_movement:
+            return {
+                "type": "praise",
+                "message": "Open day and you're already moving. Keep it up.",
+            }
+
+        # Lunch free + low movement
+        if lunch_free and low_movement and steps_today > 0:
+            return {
+                "type": "opportunity",
+                "message": "Lunch looks free. A walk then would grow your meadow.",
+            }
+
+    # --- Movement-only nudges (no calendar or no events) ---
+    if today_sweets > 0 and low_movement:
         return {
             "type": "gentle",
             "message": "You've enjoyed a treat today. A short walk would keep your garden growing.",
@@ -488,7 +530,7 @@ def _get_movement_nudge(user: User, today: date, workouts_this_week: list,
             "type": "remind",
             "message": f"Weekend ahead \u2014 {remaining} min left to hit your weekly target.",
         }
-    elif steps_today > 0 and steps_today < step_target * 0.5:
+    elif steps_today > 0 and low_movement:
         return {
             "type": "encourage",
             "message": "Still early \u2014 a walk after lunch could get you closer to your step target.",
