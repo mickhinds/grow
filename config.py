@@ -62,3 +62,7 @@ class Config:
         {"day": 1, "time": "17:00", "duration": 60, "type": "Kettlebell"},  # Tuesday
         {"day": 3, "time": "07:30", "duration": 60, "type": "Kettlebell"},  # Thursday
     ]
+
+    # Ollama (local LLM)
+    OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "ministral-3b")

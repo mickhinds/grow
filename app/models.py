@@ -361,6 +361,43 @@ class CalendarEvent(db.Model):
     synced_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class AIInsight(db.Model):
+    """Pre-computed AI insights — generated in background, shown on dashboard.
+
+    The AI pipeline runs via cron (morning + weekly), stores results here.
+    Dashboard reads the latest insight instead of calling Ollama on page load.
+    This keeps page loads fast and gracefully handles Ollama being unavailable.
+    """
+
+    __tablename__ = "ai_insights"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+
+    # Type: "morning" (daily insight) or "weekly" (Sunday report)
+    insight_type = db.Column(db.String(20), nullable=False, default="morning")
+
+    # The user-facing message (output of Voice agent)
+    message = db.Column(db.Text, nullable=False)
+
+    # The structured analysis (output of Analyst agent, stored as JSON string)
+    analysis_json = db.Column(db.Text)
+
+    # Source: "ai" (Ollama generated) or "rules" (fallback)
+    source = db.Column(db.String(10), default="ai")
+
+    # Was this shown to the user?
+    shown = db.Column(db.Boolean, default=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "date", "insight_type",
+                            name="uq_ai_insight_user_date_type"),
+    )
+
+
 class Notification(db.Model):
     """Nudges and insights shown on the dashboard."""
 

@@ -8,7 +8,7 @@ from flask import Blueprint, render_template, current_app, redirect, url_for, fl
 from app.models import (
     db, User, OuraDaily, GardenState, GardenHistory,
     IFSession, WeightTracking, Notification, Workout, FoodLog,
-    CalendarEvent, Disruption,
+    CalendarEvent, Disruption, AIInsight,
 )
 from app.services.garden_engine import get_level_progress
 from app.services.google_calendar import analyze_day
@@ -235,8 +235,27 @@ def index():
     # Greeting — time-based + contextual
     greeting = _get_greeting(user, oura, day_analysis)
 
-    # Status sentence — the voice of the app
-    status_sentence = compose_status_sentence(user, today)
+    # Status sentence — AI-composed if available, rule-based fallback
+    ai_insight = AIInsight.query.filter_by(
+        user_id=user.id, date=today, insight_type="morning",
+    ).first()
+    if ai_insight and ai_insight.message:
+        status_sentence = ai_insight.message
+        ai_source = ai_insight.source  # "ai" or "rules"
+        # Mark as shown
+        if not ai_insight.shown:
+            ai_insight.shown = True
+            db.session.commit()
+    else:
+        status_sentence = compose_status_sentence(user, today)
+        ai_source = "rules"
+
+    # Weekly report (show on Sundays)
+    weekly_report = None
+    if today.weekday() == 6:  # Sunday
+        weekly_report = AIInsight.query.filter_by(
+            user_id=user.id, date=today, insight_type="weekly",
+        ).first()
 
     # Weekly focus
     focus_suggestions = []
@@ -302,6 +321,8 @@ def index():
         anomalies=anomalies,
         active_disruptions=active_disruptions,
         adapting_disruptions=adapting_disruptions,
+        ai_source=ai_source,
+        weekly_report=weekly_report,
     )
 
 

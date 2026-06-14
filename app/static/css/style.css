@@ -696,6 +696,20 @@ textarea.form-input {
   font-style: italic;
 }
 
+.ai-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
 /* --- Garden progress row --- */
 .garden-progress-row {
   display: flex;
