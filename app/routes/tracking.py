@@ -1,6 +1,7 @@
-"""Tracking routes — weight, IF, food logging.
+"""Tracking routes — weight, IF, food logging, exercise.
 
 These are the manual inputs. Kept minimal: quick taps, not data entry.
+Unified Log tab brings everything together in one place.
 """
 
 from datetime import date, datetime, timedelta
@@ -12,6 +13,42 @@ from app.services.garden_engine import update_garden
 from app.services.micro_habits import complete_micro_habit, dismiss_micro_habit
 
 bp = Blueprint("tracking", __name__)
+
+# Max days back for backfill logging
+BACKFILL_MAX_DAYS = 7
+
+ACTIVITY_TYPES = [
+    "Walking", "Cycling", "Kettlebell", "Running", "Swimming",
+    "Yoga", "Boxing", "Garden work", "Gym", "Other",
+]
+
+
+def _parse_and_validate_date(date_str, default=None):
+    """Parse a date string and validate it's within backfill range.
+
+    Returns a date within [today - BACKFILL_MAX_DAYS, today].
+    Falls back to default (or today) if invalid or out of range.
+    """
+    if default is None:
+        default = date.today()
+
+    if not date_str:
+        return default
+
+    try:
+        entry_date = date.fromisoformat(date_str)
+    except (ValueError, TypeError):
+        return default
+
+    today = date.today()
+    earliest = today - timedelta(days=BACKFILL_MAX_DAYS)
+
+    if entry_date > today:
+        return today
+    if entry_date < earliest:
+        return earliest
+
+    return entry_date
 
 
 # --- Weight ---
@@ -34,7 +71,7 @@ def weight_form():
 def weight_log():
     """Log a weight entry."""
     weight_str = request.form.get("weight", "").strip()
-    date_str = request.form.get("date", date.today().isoformat())
+    date_str = request.form.get("date", "")
     waist_str = request.form.get("waist", "").strip()
     notes = request.form.get("notes", "").strip()
 
@@ -43,16 +80,12 @@ def weight_log():
         weight_kg = float(weight_str)
         if not (40 <= weight_kg <= 200):
             flash("Weight should be between 40-200 kg.", "error")
-            return redirect(url_for("tracking.weight_form"))
+            return redirect(url_for("tracking.log_page"))
     except ValueError:
         flash("Enter a valid weight.", "error")
-        return redirect(url_for("tracking.weight_form"))
+        return redirect(url_for("tracking.log_page"))
 
-    # Parse date
-    try:
-        entry_date = date.fromisoformat(date_str)
-    except ValueError:
-        entry_date = date.today()
+    entry_date = _parse_and_validate_date(date_str)
 
     # Optional waist
     waist_cm = None
@@ -73,39 +106,27 @@ def weight_log():
     db.session.commit()
 
     flash(f"Logged {weight_kg} kg.", "success")
-    return redirect(url_for("dashboard.index"))
+    return redirect(url_for("tracking.log_page"))
 
 
 # --- IF tracking ---
 
 @bp.route("/if", methods=["GET"])
 def if_form():
-    """IF logging form."""
-    user = db.session.get(User, 1)
-    today_session = IFSession.query.filter_by(user_id=1, date=date.today()).first()
-
-    recent = IFSession.query.filter_by(user_id=1).order_by(
-        IFSession.date.desc()
-    ).limit(14).all()
-
-    return render_template(
-        "if_log.html", user=user, today_session=today_session, recent=recent
-    )
+    """IF logging form. (Legacy route, redirects to unified log.)"""
+    return redirect(url_for("tracking.log_page"))
 
 
 @bp.route("/if", methods=["POST"])
 def if_log():
-    """Log IF adherence for today."""
-    entry_date_str = request.form.get("date", date.today().isoformat())
+    """Log IF adherence."""
+    entry_date_str = request.form.get("date", "")
     start_time = request.form.get("start_time", "11:00")
     end_time = request.form.get("end_time", "19:00")
     adherence = request.form.get("adherence") == "yes"
     notes = request.form.get("notes", "").strip()
 
-    try:
-        entry_date = date.fromisoformat(entry_date_str)
-    except ValueError:
-        entry_date = date.today()
+    entry_date = _parse_and_validate_date(entry_date_str)
 
     # Upsert
     existing = IFSession.query.filter_by(user_id=1, date=entry_date).first()
@@ -130,9 +151,12 @@ def if_log():
     # Recalculate garden for this day
     update_garden(1, entry_date)
 
-    emoji = "+" if adherence else "~"
-    flash(f"IF logged for {entry_date}. {emoji}", "success")
-    return redirect(url_for("dashboard.index"))
+    label = "on track" if adherence else "adjusted"
+    if entry_date == date.today():
+        flash(f"IF logged — {label}.", "success")
+    else:
+        flash(f"IF logged for {entry_date.strftime('%-d %b')} — {label}.", "success")
+    return redirect(url_for("tracking.log_page"))
 
 
 @bp.route("/if/quick", methods=["POST"])
@@ -163,13 +187,74 @@ def if_quick_log():
 # --- Food / sweet logging ---
 
 @bp.route("/log", methods=["GET"])
-def food_form():
-    """Food/sweet logging form."""
-    today_entries = FoodLog.query.filter_by(
-        user_id=1, date=date.today()
+def log_page():
+    """Unified logging hub — weight, IF, exercise, sweets. All in one place."""
+    user = db.session.get(User, 1)
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    earliest_backfill = today - timedelta(days=BACKFILL_MAX_DAYS)
+
+    # Weight
+    latest_weight = WeightTracking.query.filter_by(user_id=1).order_by(
+        WeightTracking.date.desc()
+    ).first()
+
+    # Weight trend (last 8 entries for a long-term view)
+    weight_history = WeightTracking.query.filter_by(user_id=1).order_by(
+        WeightTracking.date.desc()
+    ).limit(8).all()
+
+    # IF today
+    today_if = IFSession.query.filter_by(user_id=1, date=today).first()
+    recent_if = IFSession.query.filter_by(user_id=1).order_by(
+        IFSession.date.desc()
+    ).limit(7).all()
+
+    # Exercise this week — total minutes
+    week_workouts = Workout.query.filter(
+        Workout.user_id == 1,
+        Workout.date >= week_start,
+    ).all()
+    week_mins = sum(w.duration_mins or 0 for w in week_workouts)
+    activity_target = user.weekly_activity_target_mins or 150
+
+    # Recent workouts
+    recent_workouts = Workout.query.filter_by(user_id=1).order_by(
+        Workout.date.desc()
+    ).limit(7).all()
+
+    # Today's food entries
+    today_food = FoodLog.query.filter_by(
+        user_id=1, date=today
     ).order_by(FoodLog.created_at.desc()).all()
 
-    return render_template("food_log.html", entries=today_entries)
+    # Combined recent entries (last 7 days, all types)
+    recent_entries = _get_recent_entries(user_id=1, days=7)
+
+    return render_template(
+        "log.html",
+        user=user,
+        today=today,
+        earliest_backfill=earliest_backfill,
+        latest_weight=latest_weight,
+        weight_history=weight_history,
+        today_if=today_if,
+        recent_if=recent_if,
+        week_workouts=week_workouts,
+        week_mins=week_mins,
+        activity_target=activity_target,
+        recent_workouts=recent_workouts,
+        today_food=today_food,
+        activity_types=ACTIVITY_TYPES,
+        recent_entries=recent_entries,
+    )
+
+
+# Keep old route as alias
+@bp.route("/log-food", methods=["GET"])
+def food_form():
+    """Legacy food form route — redirects to unified log."""
+    return redirect(url_for("tracking.log_page"))
 
 
 @bp.route("/log", methods=["POST"])
@@ -178,12 +263,15 @@ def food_log():
     category = request.form.get("category", "sweet")
     description = request.form.get("description", "").strip()
     time_str = request.form.get("time", datetime.now().strftime("%H:%M"))
+    date_str = request.form.get("date", "")
     chose_not_to = request.form.get("chose_not_to") == "yes"
     notes = request.form.get("notes", "").strip()
 
+    entry_date = _parse_and_validate_date(date_str)
+
     entry = FoodLog(
         user_id=1,
-        date=date.today(),
+        date=entry_date,
         time=time_str,
         category=category,
         description=description,
@@ -193,15 +281,14 @@ def food_log():
     db.session.add(entry)
     db.session.commit()
 
-    # Update garden
-    update_garden(1, date.today())
+    update_garden(1, entry_date)
 
     if chose_not_to:
         flash("Conscious choice logged. +2 seeds.", "success")
     else:
         flash("Logged. Awareness earns a seed.", "success")
 
-    return redirect(url_for("dashboard.index"))
+    return redirect(url_for("tracking.log_page"))
 
 
 @bp.route("/log/quick-sweet", methods=["POST"])
@@ -221,7 +308,8 @@ def quick_sweet():
     db.session.commit()
     update_garden(1, date.today())
     flash("Sweet logged. +1 seed for awareness.", "success")
-    return redirect(url_for("dashboard.index"))
+    next_url = request.form.get("next", url_for("dashboard.index"))
+    return redirect(next_url)
 
 
 @bp.route("/log/quick-skip", methods=["POST"])
@@ -241,57 +329,29 @@ def quick_skip():
     db.session.commit()
     update_garden(1, date.today())
     flash("Strong choice. +2 seeds.", "success")
-    return redirect(url_for("dashboard.index"))
+    next_url = request.form.get("next", url_for("dashboard.index"))
+    return redirect(next_url)
 
 
 # --- Workout / Exercise logging ---
 
-ACTIVITY_TYPES = [
-    "Kettlebell", "Boxing", "Cycling", "Walking", "Running",
-    "Swimming", "Yoga", "Garden work", "Other",
-]
-
-
 @bp.route("/exercise", methods=["GET"])
 def exercise_form():
-    """Exercise logging form + history."""
-    recent = Workout.query.filter_by(user_id=1).order_by(
-        Workout.date.desc()
-    ).limit(20).all()
-
-    # This week's count
-    today = date.today()
-    week_start = today - timedelta(days=today.weekday())
-    week_count = Workout.query.filter(
-        Workout.user_id == 1,
-        Workout.date >= week_start,
-    ).count()
-
-    user = db.session.get(User, 1)
-
-    return render_template(
-        "exercise.html",
-        recent=recent,
-        week_count=week_count,
-        target=user.weekly_training_target or 2,
-        activity_types=ACTIVITY_TYPES,
-    )
+    """Exercise logging form + history. (Legacy route, redirects to unified log.)"""
+    return redirect(url_for("tracking.log_page"))
 
 
 @bp.route("/exercise", methods=["POST"])
 def exercise_log():
-    """Log a workout manually."""
+    """Log any movement — kettlebell, walking, cycling, anything."""
     activity_type = request.form.get("activity_type", "Other").strip()
     duration_str = request.form.get("duration", "").strip()
-    date_str = request.form.get("date", date.today().isoformat())
+    date_str = request.form.get("date", "")
     time_str = request.form.get("time", datetime.now().strftime("%H:%M"))
     intensity = request.form.get("intensity", "medium")
     notes = request.form.get("notes", "").strip()
 
-    try:
-        entry_date = date.fromisoformat(date_str)
-    except ValueError:
-        entry_date = date.today()
+    entry_date = _parse_and_validate_date(date_str)
 
     duration_mins = None
     if duration_str:
@@ -315,21 +375,31 @@ def exercise_log():
 
     update_garden(1, entry_date)
 
-    flash(f"{activity_type} logged. +4 seeds for training!", "success")
-    return redirect(url_for("dashboard.index"))
+    dur_label = f" ({duration_mins} min)" if duration_mins else ""
+    flash(f"{activity_type}{dur_label} logged.", "success")
+    return redirect(url_for("tracking.log_page"))
 
 
 @bp.route("/exercise/quick", methods=["POST"])
 def exercise_quick_log():
-    """Quick one-tap workout log."""
-    activity_type = request.form.get("activity_type", "Kettlebell")
+    """Quick one-tap activity log from dashboard."""
+    activity_type = request.form.get("activity_type", "Walking")
+    duration_str = request.form.get("duration", "").strip()
     today = date.today()
+
+    duration_mins = None
+    if duration_str:
+        try:
+            duration_mins = int(duration_str)
+        except ValueError:
+            pass
 
     workout = Workout(
         user_id=1,
         date=today,
         start_time=datetime.now().strftime("%H:%M"),
         activity_type=activity_type,
+        duration_mins=duration_mins,
         source="manual",
         intensity="medium",
     )
@@ -337,7 +407,7 @@ def exercise_quick_log():
     db.session.commit()
 
     update_garden(1, today)
-    flash(f"{activity_type} session logged!", "success")
+    flash(f"{activity_type} logged!", "success")
     return redirect(url_for("dashboard.index"))
 
 
@@ -366,6 +436,76 @@ def micro_habit_dismiss(completion_id):
         flash("Skipped — no worries.", "info")
 
     return redirect(url_for("dashboard.index"))
+
+
+# --- Recent entries helper ---
+
+def _get_recent_entries(user_id: int, days: int = 7):
+    """Get a combined timeline of all log entries from the last N days."""
+    cutoff = date.today() - timedelta(days=days)
+    entries = []
+
+    # Weight
+    for w in WeightTracking.query.filter(
+        WeightTracking.user_id == user_id,
+        WeightTracking.date >= cutoff,
+    ).all():
+        entries.append({
+            "date": w.date,
+            "type": "weight",
+            "label": f"{w.weight_kg} kg",
+            "detail": f"Waist: {w.waist_cm} cm" if w.waist_cm else None,
+        })
+
+    # IF
+    for s in IFSession.query.filter(
+        IFSession.user_id == user_id,
+        IFSession.date >= cutoff,
+    ).all():
+        status = "on track" if s.adherence else "adjusted"
+        entries.append({
+            "date": s.date,
+            "type": "if",
+            "label": f"IF {status}",
+            "detail": f"{s.start_time}–{s.end_time}",
+        })
+
+    # Exercise
+    for w in Workout.query.filter(
+        Workout.user_id == user_id,
+        Workout.date >= cutoff,
+    ).all():
+        dur = f" · {w.duration_mins} min" if w.duration_mins else ""
+        entries.append({
+            "date": w.date,
+            "type": "exercise",
+            "label": w.activity_type,
+            "detail": f"{w.intensity}{dur}",
+        })
+
+    # Food/sweets
+    for f in FoodLog.query.filter(
+        FoodLog.user_id == user_id,
+        FoodLog.date >= cutoff,
+    ).all():
+        if f.chose_not_to:
+            entries.append({
+                "date": f.date,
+                "type": "awareness",
+                "label": "Chose not to",
+                "detail": f.notes,
+            })
+        else:
+            entries.append({
+                "date": f.date,
+                "type": "sweet",
+                "label": f.description or f.category,
+                "detail": f.notes,
+            })
+
+    # Sort by date descending
+    entries.sort(key=lambda e: e["date"], reverse=True)
+    return entries
 
 
 # --- Disruption tracking ---

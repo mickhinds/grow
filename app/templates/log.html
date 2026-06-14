@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}Log — Grow{% endblock %}
+
+{% block content %}
+<div class="header">
+  <div class="header-greeting">Log</div>
+  <div class="header-date">Everything in one place</div>
+</div>
+
+<!-- ============================================ -->
+<!-- WEIGHT + WAIST                               -->
+<!-- ============================================ -->
+<details class="log-section" {% if not latest_weight %}open{% endif %}>
+  <summary class="log-section-header">
+    <span class="log-section-title">Weight</span>
+    {% if latest_weight %}
+    <span class="log-section-status">{{ latest_weight.weight_kg }} kg · {{ latest_weight.date.strftime('%-d %b') }}</span>
+    {% else %}
+    <span class="log-section-status text-muted">Not logged yet</span>
+    {% endif %}
+  </summary>
+  <div class="log-section-body">
+    {% if weight_history and weight_history|length >= 2 %}
+    <div class="weight-trend">
+      {% set first = weight_history[-1] %}
+      {% set last = weight_history[0] %}
+      {% set diff = last.weight_kg - first.weight_kg %}
+      {% set period_days = (last.date - first.date).days %}
+      <span class="trend-label">
+        {% if period_days > 0 %}
+        Trend over {{ period_days }} days:
+        {% if diff < 0 %}
+        <span style="color:var(--green); font-weight:600;">{{ "%.1f"|format(diff) }} kg</span>
+        {% elif diff > 0 %}
+        <span style="color:var(--amber); font-weight:600;">+{{ "%.1f"|format(diff) }} kg</span>
+        {% else %}
+        <span>stable</span>
+        {% endif %}
+        {% endif %}
+      </span>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('tracking.weight_log') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div style="display:flex; gap:8px;">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label" for="weight">Weight (kg)</label>
+          <input type="number" step="0.1" name="weight" id="weight" class="form-input"
+                 placeholder="e.g. 94.5" required>
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label class="form-label" for="waist">Waist (cm)</label>
+          <input type="number" step="0.5" name="waist" id="waist" class="form-input"
+                 placeholder="optional">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="weight-date">Date</label>
+        <input type="date" name="date" id="weight-date" class="form-input"
+               value="{{ today.isoformat() }}"
+               min="{{ earliest_backfill.isoformat() }}"
+               max="{{ today.isoformat() }}">
+      </div>
+      <div class="form-group">
+        <textarea name="notes" class="form-input" rows="1" placeholder="Notes (optional)"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Log weight</button>
+      <div class="form-hint" style="margin-top:8px;">
+        Weekly weigh-ins show the real trend. Don't sweat daily fluctuations.
+      </div>
+    </form>
+  </div>
+</details>
+
+<!-- ============================================ -->
+<!-- INTERMITTENT FASTING                         -->
+<!-- ============================================ -->
+<details class="log-section">
+  <summary class="log-section-header">
+    <span class="log-section-title">Fasting</span>
+    {% if today_if %}
+    <span class="log-section-status" style="color:var(--green);">Logged today</span>
+    {% else %}
+    <span class="log-section-status text-muted">Not logged today</span>
+    {% endif %}
+  </summary>
+  <div class="log-section-body">
+    {% if today_if %}
+    <div class="logged-today-badge">
+      {{ "On track" if today_if.adherence else "Adjusted" }} · {{ today_if.start_time }}–{{ today_if.end_time }}
+    </div>
+    {% endif %}
+    <form method="POST" action="{{ url_for('tracking.if_log') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Stayed in eating window?</label>
+        <div class="radio-group">
+          <div class="radio-btn">
+            <input type="radio" name="adherence" value="yes" id="if-yes" checked>
+            <label for="if-yes">Yes</label>
+          </div>
+          <div class="radio-btn">
+            <input type="radio" name="adherence" value="no" id="if-no">
+            <label for="if-no">No</label>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label" for="if-start">Ate from</label>
+          <input type="time" name="start_time" id="if-start" class="form-input"
+                 value="{{ user.if_start or '11:00' }}">
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label class="form-label" for="if-end">Ate until</label>
+          <input type="time" name="end_time" id="if-end" class="form-input"
+                 value="{{ user.if_end or '19:00' }}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="if-date">Date</label>
+        <input type="date" name="date" id="if-date" class="form-input"
+               value="{{ today.isoformat() }}"
+               min="{{ earliest_backfill.isoformat() }}"
+               max="{{ today.isoformat() }}">
+      </div>
+      <div class="form-group">
+        <textarea name="notes" class="form-input" rows="1" placeholder="Notes (optional)"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Log IF</button>
+    </form>
+  </div>
+</details>
+
+<!-- ============================================ -->
+<!-- MOVEMENT / EXERCISE                          -->
+<!-- ============================================ -->
+<details class="log-section">
+  <summary class="log-section-header">
+    <span class="log-section-title">Movement</span>
+    <span class="log-section-status">{{ week_mins }} / {{ activity_target }} min this week</span>
+  </summary>
+  <div class="log-section-body">
+    {% if activity_target > 0 %}
+    <div class="progress-bar" style="margin-bottom:12px;">
+      <div class="progress-fill{% if week_mins < activity_target * 0.5 %}-amber{% endif %}"
+           style="width: {{ [100, (week_mins / activity_target * 100)|round|int]|min }}%"></div>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('tracking.exercise_log') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div style="display:flex; gap:8px;">
+        <div class="form-group" style="flex:1.2;">
+          <label class="form-label">Activity</label>
+          <select name="activity_type" class="form-input">
+            {% for t in activity_types %}
+            <option value="{{ t }}">{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="flex:0.8;">
+          <label class="form-label">Minutes</label>
+          <input type="number" name="duration" class="form-input" placeholder="30">
+        </div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">Intensity</label>
+          <div class="radio-group">
+            <div class="radio-btn">
+              <input type="radio" name="intensity" id="int-low" value="low">
+              <label for="int-low">Light</label>
+            </div>
+            <div class="radio-btn">
+              <input type="radio" name="intensity" id="int-med" value="medium" checked>
+              <label for="int-med">Medium</label>
+            </div>
+            <div class="radio-btn">
+              <input type="radio" name="intensity" id="int-high" value="high">
+              <label for="int-high">Hard</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="exercise-date">Date</label>
+        <input type="date" name="date" id="exercise-date" class="form-input"
+               value="{{ today.isoformat() }}"
+               min="{{ earliest_backfill.isoformat() }}"
+               max="{{ today.isoformat() }}">
+      </div>
+      <div class="form-group">
+        <textarea name="notes" class="form-input" rows="1" placeholder="Notes (optional)"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Log movement</button>
+    </form>
+
+    {% if recent_workouts %}
+    <div class="log-recent" style="margin-top:12px;">
+      <div class="card-label">Recent</div>
+      {% for w in recent_workouts %}
+      <div class="history-item">
+        <div>
+          <span class="history-value">{{ w.activity_type }}</span>
+          {% if w.duration_mins %}<span class="text-muted text-sm"> · {{ w.duration_mins }} min</span>{% endif %}
+        </div>
+        <div class="history-date">{{ w.date.strftime('%-d %b') }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</details>
+
+<!-- ============================================ -->
+<!-- AWARENESS — sweets / choices                 -->
+<!-- ============================================ -->
+<details class="log-section">
+  <summary class="log-section-header">
+    <span class="log-section-title">Awareness</span>
+    {% if today_food %}
+    <span class="log-section-status">{{ today_food|length }} entr{{ 'ies' if today_food|length > 1 else 'y' }} today</span>
+    {% else %}
+    <span class="log-section-status text-muted">Nothing today</span>
+    {% endif %}
+  </summary>
+  <div class="log-section-body">
+    <!-- Quick actions -->
+    <div class="btn-row" style="margin-bottom:12px;">
+      <button type="button" class="btn btn-sm btn-outline" id="skip-btn-log">Chose not to</button>
+      <button type="button" class="btn btn-sm btn-ghost" id="sweet-btn-log">Had a sweet</button>
+    </div>
+
+    <!-- Chose not to — expandable -->
+    <form method="POST" action="{{ url_for('tracking.quick_skip') }}" id="skip-form-log" style="display:none;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ url_for('tracking.log_page') }}">
+      <label class="form-label" style="color:var(--muted);">What helped you say no?</label>
+      <div style="display:flex; gap:8px; align-items:flex-end; margin-top:4px;">
+        <div style="flex:1;">
+          <input type="text" name="motivation" class="form-input" placeholder="e.g. went for a walk instead" maxlength="300">
+        </div>
+        <button type="submit" class="btn btn-sm btn-outline">Log</button>
+      </div>
+    </form>
+
+    <!-- Had a sweet — expandable -->
+    <form method="POST" action="{{ url_for('tracking.quick_sweet') }}" id="sweet-form-log" style="display:none;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="what" value="sweet">
+      <input type="hidden" name="next" value="{{ url_for('tracking.log_page') }}">
+      <label class="form-label" style="color:var(--muted);">What happened?</label>
+      <div style="display:flex; gap:8px; align-items:flex-end; margin-top:4px;">
+        <div style="flex:1;">
+          <input type="text" name="reason" class="form-input" placeholder="e.g. cake at meeting" maxlength="300">
+        </div>
+        <button type="submit" class="btn btn-sm btn-ghost">Log</button>
+      </div>
+    </form>
+
+    <!-- Detailed form (for backdating) -->
+    <details style="margin-top:12px;">
+      <summary class="text-sm text-muted" style="cursor:pointer;">Detailed log (backdate, add context)</summary>
+      <form method="POST" action="{{ url_for('tracking.food_log') }}" style="margin-top:8px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+          <div class="radio-group">
+            <div class="radio-btn">
+              <input type="radio" name="category" value="sweet" id="cat-sweet" checked>
+              <label for="cat-sweet">Sweet</label>
+            </div>
+            <div class="radio-btn">
+              <input type="radio" name="category" value="snack" id="cat-snack">
+              <label for="cat-snack">Snack</label>
+            </div>
+            <div class="radio-btn">
+              <input type="radio" name="category" value="drink" id="cat-drink">
+              <label for="cat-drink">Drink</label>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <input type="text" name="description" class="form-input" placeholder="What?">
+        </div>
+        <div style="display:flex; gap:8px;">
+          <div class="form-group" style="flex:1;">
+            <input type="date" name="date" class="form-input"
+                   value="{{ today.isoformat() }}"
+                   min="{{ earliest_backfill.isoformat() }}"
+                   max="{{ today.isoformat() }}">
+          </div>
+          <div class="form-group" style="flex:1;">
+            <input type="time" name="time" class="form-input">
+          </div>
+        </div>
+        <div class="form-group">
+          <textarea name="notes" class="form-input" rows="1" placeholder="What was going on?"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Log it</button>
+      </form>
+    </details>
+
+    <div class="text-sm text-muted" style="margin-top:10px;">
+      Both earn seeds. Awareness counts. Choosing not to counts more.
+    </div>
+
+    <script>
+      document.getElementById('skip-btn-log').addEventListener('click', function() {
+        this.style.display = 'none';
+        document.getElementById('sweet-btn-log').style.display = 'none';
+        document.getElementById('sweet-form-log').style.display = 'none';
+        document.getElementById('skip-form-log').style.display = 'block';
+        document.getElementById('skip-form-log').querySelector('input[name=motivation]').focus();
+      });
+      document.getElementById('sweet-btn-log').addEventListener('click', function() {
+        this.style.display = 'none';
+        document.getElementById('skip-btn-log').style.display = 'none';
+        document.getElementById('skip-form-log').style.display = 'none';
+        document.getElementById('sweet-form-log').style.display = 'block';
+        document.getElementById('sweet-form-log').querySelector('input[name=reason]').focus();
+      });
+    </script>
+  </div>
+</details>
+
+<!-- ============================================ -->
+<!-- RECENT — combined timeline                   -->
+<!-- ============================================ -->
+{% if recent_entries %}
+<div class="card" style="margin-top:16px;">
+  <div class="card-label">Last 7 days</div>
+  {% set current_date = namespace(val=None) %}
+  {% for entry in recent_entries %}
+    {% if entry.date != current_date.val %}
+      {% set current_date.val = entry.date %}
+      <div class="timeline-date-header">
+        {{ entry.date.strftime('%A %-d %b') }}
+      </div>
+    {% endif %}
+    <div class="timeline-entry timeline-{{ entry.type }}">
+      <span class="timeline-type-dot"></span>
+      <span class="timeline-label">{{ entry.label }}</span>
+      {% if entry.detail %}
+      <span class="timeline-detail">{{ entry.detail }}</span>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

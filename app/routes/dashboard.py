@@ -65,6 +65,36 @@ def _auto_sync_oura(user, today):
         db.session.rollback()
 
 
+def _auto_sync_calendar(user, today):
+    """Auto-sync today's Google Calendar events if stale or missing.
+
+    Syncs on every dashboard load if we haven't synced in the last 30 minutes.
+    Calendar data changes frequently (new meetings, cancellations), so
+    we sync more aggressively than Oura.
+    """
+    if not (user.google_access_token and user.google_calendar_ids):
+        return
+
+    # Check if we have recent events — use synced_at to determine freshness
+    latest_event = CalendarEvent.query.filter_by(
+        user_id=user.id, date=today,
+    ).order_by(CalendarEvent.synced_at.desc()).first()
+
+    # Sync if no events exist OR if last sync was > 30 min ago
+    if latest_event and latest_event.synced_at:
+        age_mins = (datetime.utcnow() - latest_event.synced_at).total_seconds() / 60
+        if age_mins < 30:
+            return  # Fresh enough
+
+    try:
+        from app.services.google_calendar import GoogleCalendarClient
+        client = GoogleCalendarClient(current_app.config, user_id=user.id)
+        client.sync_events(today)
+        logger.info(f"Calendar auto-sync complete for {today}")
+    except Exception as e:
+        logger.error(f"Calendar auto-sync failed: {e}")
+
+
 def _sync_one_day(client, user_id, day):
     """Fetch and upsert Oura daily data for one day."""
     data = client.fetch_all_daily(day)
@@ -188,16 +218,16 @@ def index():
         Workout.date.desc()
     ).limit(3).all()
 
-    # Calendar context — only active if connected AND calendars selected
+    # Calendar context — auto-sync + analyze
     google_connected = bool(user.google_access_token and user.google_calendar_ids)
     today_events = []
     day_analysis = None
     if google_connected:
+        _auto_sync_calendar(user, today)
         today_events = CalendarEvent.query.filter_by(
             user_id=1, date=today,
         ).order_by(CalendarEvent.start_time).all()
-        if today_events:
-            day_analysis = analyze_day(1, today)
+        day_analysis = analyze_day(1, today)
 
     # Micro-habits for today
     micro_habits = get_todays_micro_habits(user.id, today)
@@ -236,6 +266,10 @@ def index():
     ).first()
     last_synced = latest_sync.synced_at if latest_sync else None
 
+    # Weekly activity minutes (computed here, not in template, to handle None)
+    week_activity_mins = sum(w.duration_mins or 0 for w in workouts_this_week)
+    activity_target = user.weekly_activity_target_mins or 150
+
     return render_template(
         "dashboard.html",
         user=user,
@@ -254,6 +288,8 @@ def index():
         oura_connected=oura_connected,
         workouts_this_week=workouts_this_week,
         recent_workouts=recent_workouts,
+        week_activity_mins=week_activity_mins,
+        activity_target=activity_target,
         movement_nudge=movement_nudge,
         micro_habits=micro_habits,
         google_connected=google_connected,
@@ -392,8 +428,8 @@ def _get_if_status(user: User) -> dict:
 def _get_movement_nudge(user: User, today: date, workouts_this_week: list,
                         day_analysis: dict = None) -> dict:
     """Generate a gentle, calendar-aware movement nudge."""
-    week_count = len(workouts_this_week)
-    target = user.weekly_training_target or 2
+    week_mins = sum(w.duration_mins or 0 for w in workouts_this_week)
+    target_mins = user.weekly_activity_target_mins or 150
 
     # Check if there was a sweet logged today
     today_sweets = FoodLog.query.filter(
@@ -408,8 +444,9 @@ def _get_movement_nudge(user: User, today: date, workouts_this_week: list,
     steps_today = oura_today.steps if oura_today and oura_today.steps else 0
     step_target = user.step_target or 8000
 
-    # Calendar-aware nudges take priority when calendar is connected
-    if day_analysis:
+    # Calendar nudges disabled until calendar sync is reliable
+    # (user feedback: "looks like a light day" when day is fully packed)
+    if False and day_analysis:
         if day_analysis["is_busy_day"] and day_analysis["free_gaps"]:
             # Busy day with gaps — suggest using them
             best_gap = max(day_analysis["free_gaps"], key=lambda g: g["duration_mins"])
@@ -423,7 +460,7 @@ def _get_movement_nudge(user: User, today: date, workouts_this_week: list,
                 "type": "calendar",
                 "message": "Heavy day \u2014 take it easy. Even a short stretch between calls counts.",
             }
-        elif day_analysis["is_light_day"] and week_count < target:
+        elif day_analysis["is_light_day"] and week_mins < target_mins:
             return {
                 "type": "calendar",
                 "message": "Light calendar today. Good time for a training session?",
@@ -440,16 +477,16 @@ def _get_movement_nudge(user: User, today: date, workouts_this_week: list,
             "type": "gentle",
             "message": "You've enjoyed a treat today. A short walk would keep your garden growing.",
         }
-    elif week_count >= target:
+    elif week_mins >= target_mins:
         return {
             "type": "praise",
-            "message": f"Great week \u2014 {week_count} sessions done! Your stones are growing.",
+            "message": f"Strong week \u2014 {week_mins} min logged! Your stones are growing.",
         }
-    elif today.weekday() >= 4 and week_count < target:
-        remaining = target - week_count
+    elif today.weekday() >= 4 and week_mins < target_mins:
+        remaining = target_mins - week_mins
         return {
             "type": "remind",
-            "message": f"Weekend ahead \u2014 {remaining} session{'s' if remaining > 1 else ''} left to hit your weekly target.",
+            "message": f"Weekend ahead \u2014 {remaining} min left to hit your weekly target.",
         }
     elif steps_today > 0 and steps_today < step_target * 0.5:
         return {

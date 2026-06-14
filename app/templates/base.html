@@ -34,15 +34,7 @@
       <span class="nav-icon">&#9678;</span>
       <span class="nav-label">Home</span>
     </a>
-    <a href="{{ url_for('tracking.if_form') }}" class="nav-item {% if 'if' in request.endpoint|default('') %}active{% endif %}">
-      <span class="nav-icon">&#9201;</span>
-      <span class="nav-label">IF</span>
-    </a>
-    <a href="{{ url_for('tracking.exercise_form') }}" class="nav-item {% if 'exercise' in request.endpoint|default('') %}active{% endif %}">
-      <span class="nav-icon">&#9883;</span>
-      <span class="nav-label">Exercise</span>
-    </a>
-    <a href="{{ url_for('tracking.food_form') }}" class="nav-item {% if 'food' in request.endpoint|default('') or 'log' in request.endpoint|default('') %}active{% endif %}">
+    <a href="{{ url_for('tracking.log_page') }}" class="nav-item {% if 'log' in request.endpoint|default('') or 'food' in request.endpoint|default('') %}active{% endif %}">
       <span class="nav-icon">&#9998;</span>
       <span class="nav-label">Log</span>
     </a>

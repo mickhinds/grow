@@ -346,6 +346,15 @@ def settings_save():
         except ValueError:
             pass
 
+    weekly_activity = request.form.get("weekly_activity_target_mins", "").strip()
+    if weekly_activity:
+        try:
+            val = int(weekly_activity)
+            if 30 <= val <= 600:
+                user.weekly_activity_target_mins = val
+        except ValueError:
+            pass
+
     db.session.commit()
     flash("Settings saved.", "success")
     return redirect(url_for("auth.settings"))

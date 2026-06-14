@@ -31,7 +31,8 @@ class User(db.Model):
     # Activity targets
     step_target = db.Column(db.Integer, default=8000)
     sleep_target_mins = db.Column(db.Integer, default=420)
-    weekly_training_target = db.Column(db.Integer, default=2)  # Sessions per week
+    weekly_training_target = db.Column(db.Integer, default=2)  # Legacy: sessions per week
+    weekly_activity_target_mins = db.Column(db.Integer, default=150)  # Minutes per week (evidence-based: 90-120 min resistance or ~30 min/day aerobic)
 
     # Oura — Personal Access Token (simple, for own data)
     oura_pat = db.Column(db.Text)

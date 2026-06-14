@@ -73,6 +73,12 @@ Last updated: 2026-05-24
 
 ---
 
+## Priority Fixes
+
+- [ ] **Weight logging under Log tab** — Weight tracking should be accessible from the Log tab in bottom nav (alongside sweet/skip logging). Currently only reachable via "More details" on dashboard. Add weight entry + trend view to the Log page.
+
+---
+
 ## UI / Design
 
 - [x] **More coherent layout** — Dashboard redesigned: garden-hero + status sentence + focus + micro-habits + quick log above the fold. Details behind progressive disclosure.

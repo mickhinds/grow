@@ -192,10 +192,13 @@
     </div>
 
     <div class="form-group">
-      <label class="form-label" for="weekly_training_target">Weekly training sessions</label>
-      <input type="number" name="weekly_training_target" id="weekly_training_target" class="form-input"
-             value="{{ user.weekly_training_target or 2 }}" min="1" max="14">
-      <div class="form-hint">How many exercise sessions per week you're aiming for</div>
+      <label class="form-label" for="weekly_activity_target_mins">Weekly activity target (minutes)</label>
+      <input type="number" name="weekly_activity_target_mins" id="weekly_activity_target_mins" class="form-input"
+             value="{{ user.weekly_activity_target_mins or 150 }}" min="30" max="600">
+      <div class="form-hint">
+        Evidence-based guideline: 90-120 min resistance training or ~30 min moderate activity daily (150-210 min/week).
+        Any movement counts.
+      </div>
     </div>
   </div>
 

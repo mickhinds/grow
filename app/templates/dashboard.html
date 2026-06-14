@@ -358,14 +358,18 @@
   </div>
   {% endif %}
 
-  <!-- Exercise -->
+  <!-- Movement -->
   <div class="card card-purple">
-    <div class="card-label">Exercise</div>
+    <div class="card-label">Movement</div>
     <div class="stat-row">
       <span class="stat-label">This week</span>
-      <span class="stat-value {% if workouts_this_week|length >= (user.weekly_training_target or 2) %}stat-value-good{% elif workouts_this_week|length > 0 %}stat-value-warn{% endif %}">
-        {{ workouts_this_week|length }} / {{ user.weekly_training_target or 2 }} sessions
+      <span class="stat-value {% if week_activity_mins >= activity_target %}stat-value-good{% elif week_activity_mins > 0 %}stat-value-warn{% endif %}">
+        {{ week_activity_mins }} / {{ activity_target }} min
       </span>
+    </div>
+    <div class="progress-bar" style="margin-top:6px;">
+      <div class="progress-fill{% if week_activity_mins < activity_target * 0.5 %}-amber{% endif %}"
+           style="width: {{ [100, (week_activity_mins / activity_target * 100)|round|int]|min }}%"></div>
     </div>
     {% if recent_workouts %}
     <div class="mt-8">
@@ -378,12 +382,7 @@
     </div>
     {% endif %}
     <div class="btn-row mt-8">
-      <form method="POST" action="{{ url_for('tracking.exercise_quick_log') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="activity_type" value="Kettlebell">
-        <button type="submit" class="btn btn-sm btn-outline">Log kettlebell</button>
-      </form>
-      <a href="{{ url_for('tracking.exercise_form') }}" class="btn btn-sm btn-ghost">Log other</a>
+      <a href="{{ url_for('tracking.log_page') }}" class="btn btn-sm btn-outline">Log activity</a>
     </div>
   </div>
 

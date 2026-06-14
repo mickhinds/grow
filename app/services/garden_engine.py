@@ -22,7 +22,7 @@ SEEDS_IF_ADHERENCE = 3         # Maintained eating window
 SEEDS_IF_PARTIAL = 1           # Close (within 30 min)
 SEEDS_SLEEP_GOOD = 2           # Sleep score 75+
 SEEDS_SLEEP_GREAT = 1          # Bonus for 85+
-SEEDS_TRAINING = 4             # Kettlebell session
+SEEDS_TRAINING = 4             # Any logged movement session
 SEEDS_LOGGED_SWEET = 1         # Awareness: logged a sweet
 SEEDS_CHOSE_NOT_TO = 2         # Conscious skip
 SEEDS_MICRO_HABIT = 1          # Each micro-habit completion
@@ -114,33 +114,22 @@ def calculate_seeds_for_day(user: User, day: date) -> dict:
             # Partial credit: they logged it, so at least they're aware
             seeds["seeds_if"] = SEEDS_IF_PARTIAL
 
-    # --- Training ---
-    # Check actual workouts (synced from Oura or logged manually)
+    # --- Training / Movement ---
+    # Any logged activity counts — kettlebell, walking, cycling, anything
     workouts = Workout.query.filter_by(user_id=user.id, date=day).all()
     if workouts:
-        # Base seeds for any workout
+        # Base seeds for logging any movement
         seeds["seeds_training"] = SEEDS_TRAINING
-        # Bonus for high-intensity or extra-long sessions
-        for w in workouts:
-            if w.intensity == "high" or (w.duration_mins and w.duration_mins >= 60):
-                seeds["seeds_training"] += 1
-                break  # Only one bonus per day
+        # Bonus for high-intensity or longer sessions (45+ min)
+        day_total_mins = sum(w.duration_mins or 0 for w in workouts)
+        has_high_intensity = any(w.intensity == "high" for w in workouts)
+        if has_high_intensity or day_total_mins >= 45:
+            seeds["seeds_training"] += 1
 
-    # During training disruption: don't penalize for missing sessions,
-    # and award partial credit for any movement logged as workout
+    # During training disruption: partial credit for any movement
     if disruption_flags["affects_training"] and not workouts:
-        # Give awareness credit — they showed up even though they can't train
-        # (only if they did some steps, showing they're still active)
         if oura and oura.steps and oura.steps >= 3000:
             seeds["seeds_training"] = max(seeds["seeds_training"], 2)
-    elif not workouts:
-        # Normal fallback: check if schedule says training day
-        from flask import current_app
-        training_schedule = current_app.config.get("TRAINING_SCHEDULE", [])
-        is_training_day = any(t["day"] == day.weekday() for t in training_schedule)
-        if is_training_day and oura:
-            # Only give partial credit — real workout data gets full credit
-            seeds["seeds_training"] = SEEDS_TRAINING
 
     # --- Awareness (food logging) ---
     food_entries = FoodLog.query.filter_by(user_id=user.id, date=day).all()
@@ -281,7 +270,7 @@ def _update_element_growth(garden: GardenState, user_id: int):
         "meadow": effective_movement_days * (SEEDS_STEP_TARGET + SEEDS_STEP_BONUS),
         "oak": days * SEEDS_IF_ADHERENCE,
         "pond": days * (SEEDS_SLEEP_GOOD + SEEDS_SLEEP_GREAT),
-        "stones": (effective_training_days // 7) * 2 * SEEDS_TRAINING,  # ~2 training days per week
+        "stones": (effective_training_days // 7) * 3 * SEEDS_TRAINING,  # ~3 active days per week (any movement)
         "path": days * (SEEDS_LOGGED_SWEET + SEEDS_CHOSE_NOT_TO),
     }
 
