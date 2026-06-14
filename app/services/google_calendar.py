@@ -102,7 +102,7 @@ class GoogleCalendarClient:
         if resp.status_code == 401:
             raise GoogleCalendarError("Unauthorized — token may be expired")
         if resp.status_code != 200:
-            logger.error(f"Google Calendar API error: {resp.status_code}")
+            logger.error(f"Google Calendar API error {resp.status_code}: {resp.text[:500]}")
             return {}
 
         return resp.json()
