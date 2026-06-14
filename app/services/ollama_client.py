@@ -34,8 +34,8 @@ DEFAULT_BASE_URL = "http://localhost:11434"
 # Default model — Ministral 3B quantized fits in 4GB RAM
 DEFAULT_MODEL = "ministral-3b"
 
-# Request timeout in seconds
-TIMEOUT = 60
+# Request timeout in seconds — Pi 5 CPU-only needs more headroom
+TIMEOUT = 120
 
 
 class OllamaClient:
@@ -204,10 +204,22 @@ class OllamaClient:
                 return None
 
             import json
+            import re
+
+            # Small models often wrap JSON in markdown fences:
+            #   ```json\n{...}\n```
+            # Strip them before parsing.
+            cleaned = re.sub(r'^```(?:json)?\s*\n?', '', content, flags=re.MULTILINE)
+            cleaned = re.sub(r'\n?```\s*$', '', cleaned, flags=re.MULTILINE)
+            cleaned = cleaned.strip()
+
+            # Also remove **bold** markers that small models sprinkle in
+            cleaned = cleaned.replace("**", "")
+
             try:
-                return json.loads(content)
+                return json.loads(cleaned)
             except json.JSONDecodeError:
-                logger.warning(f"Ollama returned invalid JSON: {content[:200]}")
+                logger.warning(f"Ollama returned invalid JSON: {content[:300]}")
                 return None
 
         except requests.Timeout:

@@ -164,7 +164,7 @@ def generate_morning_insight(
         system=ANALYST_SYSTEM_PROMPT,
         prompt=data_prompt,
         temperature=0.3,  # Low temp for analytical consistency
-        max_tokens=300,
+        max_tokens=500,
     )
 
     if not analysis:
