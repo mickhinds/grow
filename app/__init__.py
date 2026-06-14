@@ -2,6 +2,7 @@
 
 from flask import Flask, send_from_directory, jsonify
 from flask_wtf.csrf import CSRFProtect
+from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
 from app.models import db, init_default_user
 from app.migrate import auto_migrate
@@ -12,6 +13,10 @@ csrf = CSRFProtect()
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    # Trust Caddy reverse proxy headers (X-Forwarded-Proto, X-Forwarded-Host)
+    # so url_for() generates https:// URLs for OAuth callbacks
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     # Initialize extensions
     db.init_app(app)
