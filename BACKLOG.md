@@ -114,10 +114,15 @@ Last updated: 2026-05-24
 - [ ] **Recovery arc** — Lifecycle: acute → adaptation → reintegration → resolved. Gradual return to Phase 1/2.
 
 ### AI / Local Intelligence
-- [ ] **Ollama + Ministral 3B setup** — Install on Pi, configure HTTP API, test inference speed. Also install nomic-embed-text for embeddings and sqlite-vec for vector storage.
-- [ ] **Agent network** — Five sequential agents: Data Summarizer, Pattern Finder, Question Generator, Nudge Composer, Adaptation Advisor. Each with focused prompt and structured output.
-- [ ] **Morning notification** — Daily data-informed message composed by Nudge Composer agent. Phase-aware, calendar-aware.
-- [ ] **AI insights on dashboard** — Pattern observations surfaced from Agent 2, displayed as cards.
+- [x] **Ollama + Ministral 3B setup** — Installed on Pi, running via Ollama with manually imported GGUF from HuggingFace (mistralai/Ministral-3-3B-Instruct-2512-GGUF, Q4_K_M). CPU-only, ~2 GB RAM.
+- [x] **Two-agent architecture** — Analyst (structured JSON insights) + Voice (natural language message). Python orchestrator chains them. No LangChain — direct Ollama HTTP API. Rule-based fallback when Ollama is unavailable.
+- [x] **Data compiler** — Pure Python module that gathers all data (Oura, calendar, IF, weight, garden, correlations) into structured JSON context for the LLM. Python does math, LLM interprets.
+- [x] **Morning analysis pipeline** — Cron-driven script (06:00 daily). Syncs data → compiles context → Analyst → Voice → stores in AIInsight table. Dashboard reads pre-computed result.
+- [x] **Weekly report pipeline** — Cron-driven (09:00 Sundays). Same architecture, different prompts. Shown on dashboard as "Week in review" card.
+- [x] **AI insights on dashboard** — AI-composed status sentence with "AI" badge. Falls back to rule-based sentence if Ollama is down.
+- [ ] **Prompt tuning** — Refine Analyst and Voice system prompts based on real output quality. Add Grow-specific vocabulary (garden, seeds, streaks) to Voice. Add few-shot examples.
+- [ ] **Correlation insights** — Surface calendar-vs-sleep and calendar-vs-movement patterns via Analyst agent over 14-day windows.
+- [ ] **Language support** — Add Swedish and Finnish as AI output languages for potential test users. Currently English only.
 
 ### Existing Features (carried forward)
 - [ ] **Guided setup / onboarding** — First-run wizard for goals, Oura, Google Calendar
